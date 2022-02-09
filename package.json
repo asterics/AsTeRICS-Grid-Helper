@@ -1,0 +1,23 @@
+{
+  "name": "AsTeRICS-Grid-Helper",
+  "license": "GNU Affero General Public License v3.0",
+  "bin": "index.js",
+  "dependencies": {
+    "clipboardy": "^3.0.0",
+    "express": "4.17.2",
+    "node-window-manager": "^2.2.4",
+    "robotjs": "^0.6.0"
+  },
+  "pkg": {
+    "assets": [
+      "views/**/*"
+    ],
+    "targets": [
+      "win",
+      "node12-win",
+      "macos",
+      "linux"
+    ],
+    "outputPath": "bin"
+  }
+}
