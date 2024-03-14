@@ -1,6 +1,8 @@
 import azure.cognitiveservices.speech as speechsdk
 from credentials import credentials
 
+providerId = "azure"
+
 speech_config = speechsdk.SpeechConfig(credentials["azureKey1"], credentials["azureRegion"])
 audio_config = speechsdk.audio.AudioOutputConfig(use_default_speaker=True)
 
@@ -10,6 +12,9 @@ speech_config.speech_synthesis_voice_name='en-US-JennyNeural'
 
 speech_synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
 speaking = False
+
+def getProviderId():
+    return providerId
 
 def speak(text, voiceId=None):
     global speaking, speech_synthesizer
@@ -44,13 +49,6 @@ def getVoices():
 
     for voice in voices:
         list.append({"id": voice.short_name, "name": voice.name, "lang": voice.locale})
-        # print("Voice:")
-        # print(" - voice_type: %s" % voice.voice_type)
-        # print(" - Name: %s" % voice.name)
-        # print(" - short_name: %s" % voice.short_name)
-        # print(" - locale: %s" % voice.locale)
-        # print(" - local_name: %s" % voice.local_name)
-        # print(" - gender: %s" % voice.gender)
 
     return list
 

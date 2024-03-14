@@ -10,20 +10,22 @@ CORS(app)
 
 @app.route('/voices/', methods=['GET'])
 def voices():
-    voices = speechManager.getVoices("azure")
+    voices = speechManager.getVoices()
     return jsonify(voices)
 
 
 @app.route('/speak/<text>/', methods=['POST', 'GET'])
-@app.route('/speak/<text>/<voiceId>', methods=['POST', 'GET'])
-def speak(text, voiceId=None):
-    speechManager.speak(text, "azure", voiceId)
+@app.route('/speak/<text>/<providerId>/', methods=['POST', 'GET'])
+@app.route('/speak/<text>/<providerId>/<voiceId>', methods=['POST', 'GET'])
+def speak(text, providerId=None, voiceId=None):
+    speechManager.speak(text, providerId, voiceId)
     return jsonify(True)
 
 
 @app.route('/speaking/', methods=['GET'])
 def speaking():
-    return jsonify(speechManager.isSpeaking())
+    speaking = speechManager.isSpeaking()
+    return jsonify(speaking)
 
 
 @app.route('/stop/', methods=['GET', 'POST'])
