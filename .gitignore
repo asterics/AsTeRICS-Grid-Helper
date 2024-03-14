@@ -1,3 +1,8 @@
 *.iml
 bin/
 node_modules/
+credentials.py
+*.wav
+*.ogg
+*.mp3
+*.pyc
