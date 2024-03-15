@@ -2,6 +2,7 @@
 
 from flask import Flask, jsonify, request, make_response
 from flask_cors import CORS
+from urllib.parse import unquote
 import speechManager
 
 app = Flask(__name__)
@@ -17,14 +18,20 @@ def voices():
 @app.route('/speak/<text>/', methods=['POST', 'GET'])
 @app.route('/speak/<text>/<providerId>/', methods=['POST', 'GET'])
 @app.route('/speak/<text>/<providerId>/<voiceId>', methods=['POST', 'GET'])
-def speak(text, providerId=None, voiceId=None):
+def speak(text, providerId="", voiceId=""):
+    text = unquote(text)
+    providerId = unquote(providerId)
+    voiceId = unquote(voiceId)
     speechManager.speak(text, providerId, voiceId)
     return jsonify(True)
 
 @app.route('/speakdata/<text>/', methods=['POST', 'GET'])
 @app.route('/speakdata/<text>/<providerId>/', methods=['POST', 'GET'])
 @app.route('/speakdata/<text>/<providerId>/<voiceId>', methods=['POST', 'GET'])
-def speakData(text, providerId=None, voiceId=None):
+def speakData(text, providerId="", voiceId=""):
+    text = unquote(text)
+    providerId = unquote(providerId)
+    voiceId = unquote(voiceId)
     data = speechManager.getSpeakData(text, providerId, voiceId)
     response = make_response(data)
     response.headers.set('Content-Type', 'application/octet-stream')
