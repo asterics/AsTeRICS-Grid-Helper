@@ -1,9 +1,9 @@
-import espeak
+import pytts
 import msazure_playing
 import msazure_data
 from constants import constants
 
-speechProviderList = [msazure_playing, msazure_data]
+speechProviderList = [pytts, msazure_playing, msazure_data]
 
 requiredFnsAll = ["getProviderId", "getVoiceType", "getVoices"]
 requiredFnsPlaying = ["speak", "isSpeaking", "stop"]
