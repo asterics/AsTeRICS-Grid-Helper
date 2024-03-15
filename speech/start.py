@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, make_response
 from flask_cors import CORS
 import speechManager
 
@@ -20,6 +20,15 @@ def voices():
 def speak(text, providerId=None, voiceId=None):
     speechManager.speak(text, providerId, voiceId)
     return jsonify(True)
+
+@app.route('/speakdata/<text>/', methods=['POST', 'GET'])
+@app.route('/speakdata/<text>/<providerId>/', methods=['POST', 'GET'])
+@app.route('/speakdata/<text>/<providerId>/<voiceId>', methods=['POST', 'GET'])
+def speakData(text, providerId=None, voiceId=None):
+    data = speechManager.getSpeakData(text, providerId, voiceId)
+    response = make_response(data)
+    response.headers.set('Content-Type', 'application/octet-stream')
+    return response
 
 
 @app.route('/speaking/', methods=['GET'])
