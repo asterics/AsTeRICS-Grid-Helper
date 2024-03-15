@@ -42,6 +42,7 @@ def getVoices():
         for voice in voices:
             voice["providerId"] = provider.getProviderId()
             voice["type"] = provider.getVoiceType()
+            voice["name"] = voice["name"] + ", " + provider.getProviderId()
             allVoices.append(voice)
 
     return allVoices

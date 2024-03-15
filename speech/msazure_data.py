@@ -22,7 +22,7 @@ def getVoices():
     voices = result.voices
 
     for voice in voices:
-        list.append({"id": voice.short_name, "name": voice.name + "_data", "lang": voice.locale})
+        list.append({"id": voice.short_name, "name": voice.name, "lang": voice.locale})
 
     return list
 

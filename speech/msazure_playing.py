@@ -2,7 +2,7 @@ import azure.cognitiveservices.speech as speechsdk
 from credentials import credentials
 from constants import constants
 
-providerId = "azure"
+providerId = "azure_playing"
 
 speech_config = speechsdk.SpeechConfig(credentials["azureKey1"], credentials["azureRegion"])
 speech_config.speech_synthesis_voice_name='en-US-JennyNeural'
@@ -23,7 +23,7 @@ def getVoices():
     voices = result.voices
 
     for voice in voices:
-        list.append({"id": voice.name, "name": voice.name + "_playing", "lang": voice.locale})
+        list.append({"id": voice.name, "name": voice.name, "lang": voice.locale})
 
     return list
 
