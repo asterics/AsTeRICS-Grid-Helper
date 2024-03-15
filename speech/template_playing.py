@@ -12,7 +12,8 @@ def getVoiceType():
 
 def getVoices():
     list = []
-    # fill list with voices containing dictionary elements with keys ["id", "name", "lang"]
+    # add supported voices
+    list.append({"id": "my-voice", "name": "My voice", "lang": "en"})
     return list
 
 def speak(text, voiceId=None):
