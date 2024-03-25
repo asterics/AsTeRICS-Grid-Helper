@@ -25,14 +25,14 @@ def getCacheFileFullPath(text, providerId, voiceId):
 
 def getTempFileData(providerId):
     path = getTempFileFullPath(providerId)
-    in_file = open(path, "rb") # opening for [r]eading as [b]inary
+    in_file = open(path, "rb")
     data = in_file.read()
     in_file.close()
     return data
 
 def saveCacheData(text, providerId, voiceId, data):
     path = getCacheFileFullPath(text, providerId, voiceId)
-    out_file = open(path, "wb") # opening for [r]eading as [b]inary
+    out_file = open(path, "wb")
     out_file.write(data)
     out_file.close()
 
@@ -40,7 +40,7 @@ def getCacheData(text, providerId, voiceId):
     data = None
     path = getCacheFileFullPath(text, providerId, voiceId)
     if os.path.isfile(path):
-        in_file = open(path, "rb") # opening for [r]eading as [b]inary
+        in_file = open(path, "rb")
         data = in_file.read()
         in_file.close()
     return data
