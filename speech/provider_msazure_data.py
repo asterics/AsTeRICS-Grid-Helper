@@ -1,10 +1,10 @@
 import azure.cognitiveservices.speech as speechsdk
-from credentials import credentials
+import credentials
 from constants import constants
 
 providerId = "azure_data"
 
-speech_config = speechsdk.SpeechConfig(credentials["azureKey1"], credentials["azureRegion"])
+speech_config = speechsdk.SpeechConfig(credentials.AZURE_KEY_1, credentials.AZURE_REGION)
 speech_config.speech_synthesis_voice_name='en-US-JennyNeural'
 
 speech_synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=None)
