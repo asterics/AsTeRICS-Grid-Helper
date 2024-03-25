@@ -1,4 +1,5 @@
 import os
+from urllib.parse import quote
 
 def getTempFilename(providerId):
     providerId = getSafeString(providerId)
@@ -14,7 +15,7 @@ def getTempFileFullPath(providerId):
 
 def getCacheFileFullPath(text, providerId, voiceId):
     providerId = getSafeString(providerId)
-    text = getSafeString(text)
+    text = quote(text)
     voiceId = getSafeString(str(voiceId))
     currentDir = os.path.dirname(__file__)
     dirname = os.path.join(currentDir, "temp", providerId, voiceId)
