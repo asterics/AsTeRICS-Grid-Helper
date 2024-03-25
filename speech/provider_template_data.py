@@ -18,4 +18,9 @@ def getVoices():
 
 def getSpeakData(text, voiceId=None):
     # return byte array of data containing speech
+    # if your speech provider stores the speech data to file, you can use something like this:
+    # import util at the top
+    # path = util.getTempFileFullPath(providerId)
+    # os.system("shell command including <text> {} and <output-path> {}".format(text, path))
+    # return util.getTempFileData(providerId)
     return None

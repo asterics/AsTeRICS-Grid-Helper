@@ -1,5 +1,6 @@
 import os
 from constants import constants
+import util
 
 providerId = "piper_data"
 
@@ -17,11 +18,6 @@ def getVoices():
 
 def getSpeakData(text, voiceId=None):
     # return byte array of data containing speech
-    os.system("echo '{}' | piper --model en_US-lessac-medium --output_file temp.wav".format(text))
-
-    dirname = os.path.dirname(__file__)
-    filename = os.path.join(dirname, 'temp.wav')
-    in_file = open(filename, "rb") # opening for [r]eading as [b]inary
-    data = in_file.read()
-    in_file.close()
-    return data
+    path = util.getTempFileFullPath(providerId)
+    os.system("echo '{}' | piper --model en_US-lessac-medium --output_file {}".format(text, path))
+    return util.getTempFileData(providerId)
