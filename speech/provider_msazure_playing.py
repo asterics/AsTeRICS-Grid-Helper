@@ -1,10 +1,10 @@
 import azure.cognitiveservices.speech as speechsdk
-from credentials import credentials
-from constants import constants
+import credentials
+import constants
 
 providerId = "azure_playing"
 
-speech_config = speechsdk.SpeechConfig(credentials["azureKey1"], credentials["azureRegion"])
+speech_config = speechsdk.SpeechConfig(credentials.AZURE_KEY_1, credentials.AZURE_REGION)
 speech_config.speech_synthesis_voice_name='en-US-JennyNeural'
 audio_config = speechsdk.audio.AudioOutputConfig(use_default_speaker=True)
 
@@ -15,7 +15,7 @@ def getProviderId():
     return providerId
 
 def getVoiceType():
-    return constants["VOICE_TYPE_EXTERNAL_PLAYING"]
+    return constants.VOICE_TYPE_EXTERNAL_PLAYING
 
 def getVoices():
     list = []

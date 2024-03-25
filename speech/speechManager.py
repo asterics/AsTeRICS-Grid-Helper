@@ -1,5 +1,5 @@
 import config
-from constants import constants
+import constants
 import util
 
 requiredFnsAll = ["getProviderId", "getVoiceType", "getVoices"]
@@ -53,7 +53,9 @@ def getVoices():
 
 def initProviders():
     for provider in config.speechProviderList:
-        id = provider.getProviderId() if hasattr(provider, "getProviderId") else "noProviderId"
+        id = provider.getProviderId() if hasattr(provider, "getProviderId") else "fill_provider_id"
+        if id == "fill_provider_id":
+            raise Exception("ERROR: '{}' is an invalid provider ID!".format(id))
 
         if id in speechProviders:
             raise Exception("ERROR: duplicated speech provider with ID '{}'!".format(id))
@@ -64,12 +66,12 @@ def initProviders():
 
         voiceType = provider.getVoiceType()
         additionalRequiredFns = None
-        if voiceType == constants["VOICE_TYPE_EXTERNAL_PLAYING"]:
+        if voiceType == constants.VOICE_TYPE_EXTERNAL_PLAYING:
             additionalRequiredFns = requiredFnsPlaying
-        elif voiceType == constants["VOICE_TYPE_EXTERNAL_DATA"]:
+        elif voiceType == constants.VOICE_TYPE_EXTERNAL_DATA:
             additionalRequiredFns = requiredFnsData
         else:
-            raise Exception("ERROR: voice type of provider '{}' invalid (must be '{}' or '{}')!".format(id, constants["VOICE_TYPE_EXTERNAL_PLAYING"], constants["VOICE_TYPE_EXTERNAL_DATA"]))
+            raise Exception("ERROR: voice type of provider '{}' invalid (must be '{}' or '{}')!".format(id, constants.VOICE_TYPE_EXTERNAL_PLAYING, constants.VOICE_TYPE_EXTERNAL_DATA))
 
         for fnName in additionalRequiredFns:
             if not hasattr(provider, fnName):

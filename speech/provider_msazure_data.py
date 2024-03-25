@@ -1,6 +1,6 @@
 import azure.cognitiveservices.speech as speechsdk
 import credentials
-from constants import constants
+import constants
 
 providerId = "azure_data"
 
@@ -14,7 +14,7 @@ def getProviderId():
     return providerId
 
 def getVoiceType():
-    return constants["VOICE_TYPE_EXTERNAL_DATA"]
+    return constants.VOICE_TYPE_EXTERNAL_DATA
 
 def getVoices():
     list = []

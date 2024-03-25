@@ -1,5 +1,5 @@
 import os
-from constants import constants
+import constants
 import util
 
 providerId = "piper_data"
@@ -8,7 +8,7 @@ def getProviderId():
     return providerId
 
 def getVoiceType():
-    return constants["VOICE_TYPE_EXTERNAL_DATA"]
+    return constants.VOICE_TYPE_EXTERNAL_DATA
 
 def getVoices():
     list = []

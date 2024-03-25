@@ -1,5 +1,5 @@
 import pyttsx3
-from constants import constants
+import constants
 
 engine = pyttsx3.init()
 speaking = False
@@ -8,7 +8,7 @@ def getProviderId():
     return "pytts"
 
 def getVoiceType():
-    return constants["VOICE_TYPE_EXTERNAL_PLAYING"]
+    return constants.VOICE_TYPE_EXTERNAL_PLAYING
 
 def speak(text, voiceId=None):
     global speaking

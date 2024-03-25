@@ -1,6 +1,6 @@
 # template for a speech provider returning binary data
 
-from constants import constants
+import constants
 
 providerId = "fill_provider_id"
 
@@ -8,7 +8,7 @@ def getProviderId():
     return providerId
 
 def getVoiceType():
-    return constants["VOICE_TYPE_EXTERNAL_DATA"]
+    return constants.VOICE_TYPE_EXTERNAL_DATA
 
 def getVoices():
     list = []
