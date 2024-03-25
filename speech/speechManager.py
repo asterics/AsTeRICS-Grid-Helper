@@ -1,9 +1,6 @@
-import pytts
-import msazure_playing
-import msazure_data
+import config
 from constants import constants
-
-speechProviderList = [pytts, msazure_playing, msazure_data]
+import util
 
 requiredFnsAll = ["getProviderId", "getVoiceType", "getVoices"]
 requiredFnsPlaying = ["speak", "isSpeaking", "stop"]
@@ -19,10 +16,17 @@ def speak(text, providerId, voiceId=None):
     provider.speak(text, voiceId)
 
 def getSpeakData(text, providerId, voiceId=None):
+    if config.cacheData:
+        cachedData = util.getCacheData(text, providerId, voiceId)
+        if cachedData:
+            return cachedData
     provider = speechProviders[providerId] if providerId in speechProviders else speechProviderList[0]
     if not hasattr(provider, "getSpeakData"):
         return print("ERROR: speech provider '{}' doesn't implement function 'getSpeakData'!".format(providerId))
-    return provider.getSpeakData(text, voiceId)
+    data = provider.getSpeakData(text, voiceId)
+    if config.cacheData and data and len(data) > 0:
+        util.saveCacheData(text, providerId, voiceId, data)
+    return data
 
 def isSpeaking():
     for provider in speechProviders.values():
@@ -48,7 +52,7 @@ def getVoices():
     return allVoices
 
 def initProviders():
-    for provider in speechProviderList:
+    for provider in config.speechProviderList:
         id = provider.getProviderId() if hasattr(provider, "getProviderId") else "noProviderId"
 
         if id in speechProviders:
