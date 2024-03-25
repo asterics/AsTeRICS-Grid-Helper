@@ -6,3 +6,5 @@ credentials.py
 *.ogg
 *.mp3
 *.pyc
+*.json
+*.onnx
