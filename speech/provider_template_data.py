@@ -13,7 +13,7 @@ def getVoiceType():
 def getVoices():
     list = []
     # add supported voices
-    list.append({"id": "my-voice", "name": "My voice", "lang": "en"})
+    list.append({"id": "my-voice", "name": "My voice", "lang": "en"}) # optional boolean property "local" to determine of online/offline voice
     return list
 
 def getSpeakData(text, voiceId=None):
