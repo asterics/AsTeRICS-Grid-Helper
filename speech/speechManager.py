@@ -10,7 +10,7 @@ requiredVoiceKeys = ["id", "name"]
 speechProviders = {}
 
 def speak(text, providerId, voiceId=None):
-    provider = speechProviders[providerId] if providerId in speechProviders else speechProviderList[0]
+    provider = speechProviders[providerId] if providerId in speechProviders else config.speechProviderList[0]
     if not hasattr(provider, "speak"):
         return print("ERROR: speech provider '{}' doesn't implement function 'speak'!".format(providerId))
     provider.speak(text, voiceId)
@@ -20,7 +20,7 @@ def getSpeakData(text, providerId, voiceId=None):
         cachedData = util.getCacheData(text, providerId, voiceId)
         if cachedData:
             return cachedData
-    provider = speechProviders[providerId] if providerId in speechProviders else speechProviderList[0]
+    provider = speechProviders[providerId] if providerId in speechProviders else config.speechProviderList[0]
     if not hasattr(provider, "getSpeakData"):
         return print("ERROR: speech provider '{}' doesn't implement function 'getSpeakData'!".format(providerId))
     data = provider.getSpeakData(text, voiceId)
@@ -41,7 +41,7 @@ def stop():
 
 def getVoices():
     allVoices = []
-    for provider in speechProviderList:
+    for provider in config.speechProviderList:
         voices = provider.getVoices()
         for voice in voices:
             voice["providerId"] = provider.getProviderId()
