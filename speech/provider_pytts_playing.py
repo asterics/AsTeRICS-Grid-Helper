@@ -5,7 +5,7 @@ engine = pyttsx3.init()
 speaking = False
 
 def getProviderId():
-    return "pytts"
+    return "pytts_playing"
 
 def getVoiceType():
     return constants.VOICE_TYPE_EXTERNAL_PLAYING
