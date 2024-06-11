@@ -47,6 +47,7 @@ This is a list of predefined speech providers with installation hints:
    * Create a file `speech/credentials.py` including two lines `AZURE_KEY_1 = "<your-key>"` and `AZURE_REGION = "<your-region>"`
 * **piper_data**: run `pip install piper-tts`, for more information see [Running Piper in Python](https://github.com/rhasspy/piper?tab=readme-ov-file#running-in-python).
 * **pytts_playing**: run `pip install pyttsx3`
+* **elevenlabs_data** run `pip install requests` and create a file `speech/credentials.py` with `ELEVENLABS_KEY = "<your-key>"`. Read [here how to get the API key](https://elevenlabs.io/docs/api-reference/text-to-speech#authentication).
 
 #### Configuration
 See [config.py](https://github.com/asterics/AsTeRICS-Grid-Helper/blob/main/speech/config.py), where the speech providers to use can be imported and added to the list `speechProviderList`.
