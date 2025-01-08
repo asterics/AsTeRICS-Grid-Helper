@@ -4,6 +4,8 @@
 
 This project is the spiritual successor to https://github.com/Volskaar/asterics_grid_api_v1.git. It does not extend the mentioned projects functionality but is much rather a more functional extension of the original project https://github.com/asterics/AsTeRICS-Grid.git.
 
+This PHP script is a web-based tool for scraping German verb conjugations from Wiktionary. It processes the conjugation tables and provides the data in either JSON or CSV format, based on the user's request.
+
 ## How it works
 
 1. The scraper.php performs a GET request  
