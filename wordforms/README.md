@@ -11,6 +11,8 @@ This PHP script is a web-based tool for scraping German verb conjugations from W
 1. The scraper.php performs a GET request  
 e.g. https://wordforms.asterics-foundation.org/wordforms_ndep/scraper.php?verb=insert_word_here&type=json
 
+!!!Please make sure to name the path correctly!!!
+
 2. The application retrieves the required query parameter from the request
 
 3. The application performs its functionality:
