@@ -52,7 +52,7 @@ def build_executable():
                 if os.path.exists("speech/assets/icon.icns")
                 else None
             ),
-            "engine_path": "tts_wrapper/engines/avsynth",
+            "engine": "avsynth",
         },
         "windows": {
             "name": "asterics-grid-speech.exe",
@@ -61,7 +61,7 @@ def build_executable():
                 if os.path.exists("speech/assets/icon.ico")
                 else None
             ),
-            "engine_path": "tts_wrapper/engines/sapi",
+            "engine": "sapi",
         },
         "linux": {
             "name": "asterics-grid-speech",
@@ -70,22 +70,30 @@ def build_executable():
                 if os.path.exists("speech/assets/icon.png")
                 else None
             ),
-            "engine_path": "tts_wrapper/engines/espeak",
+            "engine": "espeak",
         },
     }
 
     options = platform_options.get(
         current_platform,
-        {"name": "asterics-grid-speech", "icon": None, "engine_path": None},
+        {"name": "asterics-grid-speech", "icon": None, "engine": None},
     )
 
     # Find the tts_wrapper package path
     tts_wrapper_path = find_package_path("tts_wrapper")
-    if tts_wrapper_path and options["engine_path"]:
-        engine_path = os.path.join(tts_wrapper_path, options["engine_path"])
-        data_option = f"{engine_path}{os.pathsep}{options['engine_path']}"
+    if tts_wrapper_path:
+        # Include the entire tts_wrapper package
+        data_option = f"{tts_wrapper_path}{os.pathsep}tts_wrapper"
+
+        # Include the specific engine files
+        engine_path = os.path.join(tts_wrapper_path, "engines", options["engine"])
+        if os.path.exists(engine_path):
+            engine_option = (
+                f"{engine_path}{os.pathsep}tts_wrapper/engines/{options['engine']}"
+            )
     else:
         data_option = None
+        engine_option = None
 
     # Base PyInstaller command
     cmd = [
@@ -99,9 +107,13 @@ def build_executable():
         "speech/temp:temp",  # Include temp directory
     ]
 
-    # Add engine files if found
+    # Add tts_wrapper package if found
     if data_option:
         cmd.extend(["--add-data", data_option])
+
+    # Add engine files if found
+    if engine_option:
+        cmd.extend(["--add-data", engine_option])
 
     # Add platform-specific options
     if options["icon"]:
