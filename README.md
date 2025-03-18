@@ -5,17 +5,70 @@ Helper tools to enable [AsTeRICS Grid](https://github.com/asterics/AsTeRICS-Grid
 Normally AsTeRICS Grid uses the [Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API) and therefore voices that are installed on the operating system (e.g. SAPI voices on Windows, or voices that are coming from a TTS module on Android). Sometimes it's interesting to use voices, which aren't available as system voices. This section describes how to use an external custom speech service using Python.
 
 ### Terms
-* **Speech provider**: a Python module that implements access to a speech generating service like [MS Azure](https://azure.microsoft.com/en-us/products/ai-services/text-to-speech), [Amazon Polly](https://aws.amazon.com/polly/), [Piper](https://github.com/rhasspy/piper), [MycroftAI mimic3](https://github.com/MycroftAI/mimic3) or any others. Speech providers can have two types:
+* **Speech provider**: a Python module that implements access to a speech generating service using the [tts_wrapper](https://github.com/willwade/tts-wrapper) library. This library provides unified access to multiple TTS engines:
+  * **Online Services**:
+    * Microsoft Azure TTS
+    * Amazon Polly
+    * Google Cloud TTS
+    * IBM Watson
+    * ElevenLabs
+    * Wit.Ai
+    * Play.HT
+  * **Offline Services**:
+    * eSpeak-NG
+    * AVSynth (macOS only)
+    * SAPI (Windows only)
+    * Sherpa-ONNX (supports Piper and other ONNX models)
+  * **Experimental**:
+    * PicoTTS
+    * UWP (WinRT) Speech system (Windows 10+)
+
+  Speech providers can have two types:
    * **type "playing"**: a speech provider where playing the audio file is done internally. Using a speech provider of this type only makes sense, if it's used on the same machine as AsTeRICS Grid.
    * **type "data"**: a speech provider that generates the speech audio data, which then is used by AsTeRICS Grid and played within the browser. This type is preferable, because it makes it possible to run the speech service on any device or server and also allows caching of the data.
 
 ### Installation and Usage
 #### Speech Service
 These steps are necessary to start the speech service that can be used by AsTeRICS Grid:
-* `pip install flask flask_cors` - for installing Flask, which is needed for providing the REST API
-* `pip install pyttsx3` - only if you want to try the speech provider `provider_pytts_playing.py` which is configured by default in `config.py`, otherwise install any other dependencies needed by the used speech providers, see [predefined speech providers](#speech-providers).
-* adapt [config.py](https://github.com/asterics/AsTeRICS-Grid-Helper/blob/main/speech/config.py) for using the desired speech providers by importing them and adding them to the list `speechProviderList`.
-* `python start.py` - to start the REST API
+
+1. Install Python dependencies:
+   ```bash
+   pip install flask flask_cors
+   ```
+
+2. Install tts_wrapper with the required engines:
+   ```bash
+   # For all platforms (includes platform-specific engines)
+   pip install "py3-tts-wrapper[espeak,avsynth,sapi]"
+   
+   # For specific platforms:
+   # Linux: pip install "py3-tts-wrapper[espeak]"
+   # macOS: pip install "py3-tts-wrapper[avsynth]"
+   # Windows: pip install "py3-tts-wrapper[sapi]"
+   ```
+
+3. Install system dependencies if needed:
+   * Linux: 
+     ```bash
+     sudo apt-get install portaudio19-dev
+     sudo apt install espeak-ng  # For eSpeak support
+     ```
+   * macOS: 
+     ```bash
+     brew install portaudio
+     brew install espeak-ng  # Optional, for eSpeak support
+     ```
+   * Windows: No additional dependencies needed for SAPI
+
+4. Start the speech service:
+   ```bash
+   python speech/start.py
+   ```
+
+The service will automatically select the appropriate TTS engine based on your platform:
+- Linux: eSpeak-NG
+- macOS: AVSynth
+- Windows: SAPI
 
 #### AsTeRICS Grid
 In AsTeRICS Grid do the following steps to use the external speech provider:
@@ -23,7 +76,7 @@ In AsTeRICS Grid do the following steps to use the external speech provider:
 * Configure the `External speech service URL` with the IP/host where the API is running, port `5555`. If the speech service is running on the same computer, use `http://localhost:5555`.
 * Reload AsTeRICS Grid (`F5`)
 * Go to `Settings -> User settings -> Voice` and enable `Show all voices`
-* Verify that the additional voices are selectable and working. For the default `provider_pytts_playing` speech provider some voices like `<voice name>, pytts_playing` should be listed.
+* Verify that the additional voices are selectable and working.
 
 #### Caching
 For speech providers with type "data", all generated speech data is automatically cached to the folder `speech/temp`. If you want to cache speech data for a whole AsTeRICS Grid configuration follow these steps:
@@ -35,19 +88,36 @@ These are the important files within the folder `speech` of this repository:
 * `config.py` configuration file where it's possible to define which speech providers should be used
 * `provider_<name>_playing.py` implementation of a speech provider which generates speech and plays audio on its own
 * `provider_<name>_data.py` implementation of a speech provider which generates speech audio data and returns the binary data, which then is played by AsTeRICS Grid within the browser
+* `provider_platform_data.py` platform-specific provider that automatically selects the appropriate TTS engine
 * `start.py` main script providing a REST API which can be used by AsTeRICS Grid
 * `speechManager.py` script which manages different speech providers and is used to access them by the API defined in `start.py`
 
 ### Speech providers
 This is a list of predefined speech providers with installation hints:
-* **mimic3_data**: see [Mimic 3 installation steps](https://mycroft-ai.gitbook.io/docs/mycroft-technologies/mimic-tts/mimic-3), install in any way which provides `mimic3` as CLI-tool, which is used by the speech provider. The current implementation only uses the voice `en_UK/apope_low`, for further voices the file `provider_mimic3_data.py` must be adapted.
+
+#### Platform-specific provider
+The `platform_data` provider automatically selects the appropriate TTS engine based on your operating system:
+* Linux: Uses eSpeak-NG
+* macOS: Uses AVSynth
+* Windows: Uses SAPI
+
+No additional configuration is needed - it works out of the box on all supported platforms.
+
+#### Other providers
 * **msazure_data, msazure_playing**:
-   * run `pip install azure-cognitiveservices-speech`, for further information see [MS Azure TTS quickstart](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/get-started-text-to-speech?tabs=windows%2Cterminal&pivots=programming-language-python)
-   * to get API credentials, you have to [sign-up at MS Azure](https://azure.microsoft.com/de-de/get-started/azure-portal) and create a `SpeechServices` resource.
-   * Create a file `speech/credentials.py` including two lines `AZURE_KEY_1 = "<your-key>"` and `AZURE_REGION = "<your-region>"`
-* **piper_data**: run `pip install piper-tts`, for more information see [Running Piper in Python](https://github.com/rhasspy/piper?tab=readme-ov-file#running-in-python).
-* **pytts_playing**: run `pip install pyttsx3`
-* **elevenlabs_data** run `pip install requests` and create a file `speech/credentials.py` with `ELEVENLABS_KEY = "<your-key>"`. Read [here how to get the API key](https://elevenlabs.io/docs/api-reference/text-to-speech#authentication).
+   * Requires Azure credentials in `speech/credentials.py`:
+     ```python
+     AZURE_KEY_1 = "<your-key>"
+     AZURE_REGION = "<your-region>"
+     ```
+   * Get API credentials by [signing up at MS Azure](https://azure.microsoft.com/de-de/get-started/azure-portal) and creating a `SpeechServices` resource.
+* **piper_data**: Uses Sherpa-ONNX engine from tts_wrapper to run Piper models. No additional setup required as it uses default model paths.
+* **elevenlabs_data**: 
+   * Requires ElevenLabs API key in `speech/credentials.py`:
+     ```python
+     ELEVENLABS_KEY = "<your-key>"
+     ```
+   * Get API key from [ElevenLabs](https://elevenlabs.io/docs/api-reference/text-to-speech#authentication)
 
 #### Configuration
 See [config.py](https://github.com/asterics/AsTeRICS-Grid-Helper/blob/main/speech/config.py), where the speech providers to use can be imported and added to the list `speechProviderList`.

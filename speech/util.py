@@ -1,11 +1,14 @@
 import os
 from urllib.parse import quote
+from typing import Optional
 
-def getTempFilename(providerId):
+
+def getTempFilename(providerId: str) -> str:
     providerId = getSafeString(providerId)
     return "temp_{}.wav".format(providerId)
 
-def getTempFileFullPath(providerId):
+
+def getTempFileFullPath(providerId: str) -> str:
     providerId = getSafeString(providerId)
     currentDir = os.path.dirname(__file__)
     dirname = os.path.join(currentDir, "temp")
@@ -13,7 +16,8 @@ def getTempFileFullPath(providerId):
         os.mkdir(dirname)
     return os.path.join(dirname, getTempFilename(providerId))
 
-def getCacheFileFullPath(text, providerId, voiceId):
+
+def getCacheFileFullPath(text: str, providerId: str, voiceId: str) -> str:
     providerId = getSafeString(providerId)
     text = quote(text)
     voiceId = getSafeString(str(voiceId))
@@ -23,28 +27,27 @@ def getCacheFileFullPath(text, providerId, voiceId):
         os.makedirs(dirname)
     return os.path.join(dirname, "{}.wav".format(text))
 
-def getTempFileData(providerId):
+
+def getTempFileData(providerId: str) -> bytes:
     path = getTempFileFullPath(providerId)
-    in_file = open(path, "rb")
-    data = in_file.read()
-    in_file.close()
-    return data
+    with open(path, "rb") as in_file:
+        return in_file.read()
 
-def saveCacheData(text, providerId, voiceId, data):
+
+def saveCacheData(text: str, providerId: str, voiceId: str, data: bytes) -> None:
     path = getCacheFileFullPath(text, providerId, voiceId)
-    out_file = open(path, "wb")
-    out_file.write(data)
-    out_file.close()
+    with open(path, "wb") as out_file:
+        out_file.write(data)
 
-def getCacheData(text, providerId, voiceId):
-    data = None
+
+def getCacheData(text: str, providerId: str, voiceId: str) -> Optional[bytes]:
     path = getCacheFileFullPath(text, providerId, voiceId)
     if os.path.isfile(path):
-        in_file = open(path, "rb")
-        data = in_file.read()
-        in_file.close()
-    return data
+        with open(path, "rb") as in_file:
+            return in_file.read()
+    return None
 
-def getSafeString(string):
-    keepcharacters = (' ','.','_', '-')
+
+def getSafeString(string: str) -> str:
+    keepcharacters = (" ", ".", "_", "-")
     return "".join(c for c in string if c.isalnum() or c in keepcharacters).rstrip()

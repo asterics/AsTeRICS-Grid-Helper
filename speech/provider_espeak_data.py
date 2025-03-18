@@ -1,15 +1,15 @@
-import credentials
 import constants
 from typing import Optional
-from tts_wrapper import ElevenLabsTTS, ElevenLabsClient
+from tts_wrapper import eSpeakTTS, eSpeakClient
 from provider_base import BaseProvider
 
 
-class ElevenLabsDataProvider(BaseProvider):
+class eSpeakDataProvider(BaseProvider):
     def __init__(self):
-        client = ElevenLabsClient(credentials=(credentials.ELEVENLABS_KEY,))
-        tts = ElevenLabsTTS(client)
-        super().__init__("elevenlabs_data", constants.VOICE_TYPE_EXTERNAL_DATA, tts)
+        client = eSpeakClient()
+        tts = eSpeakTTS(client)
+        super().__init__("espeak_data", constants.VOICE_TYPE_EXTERNAL_DATA, tts)
+        self.is_local = True  # eSpeak is always local
 
     def getSpeakData(self, text: str, voiceId: Optional[str] = None) -> bytes:
         if voiceId:
@@ -18,7 +18,7 @@ class ElevenLabsDataProvider(BaseProvider):
 
 
 # Create a singleton instance
-provider = ElevenLabsDataProvider()
+provider = eSpeakDataProvider()
 
 # Export the interface functions
 getProviderId = provider.getProviderId

@@ -1,29 +1,31 @@
 # template for a speech provider that directly plays speech
 
 import constants
+from typing import Optional
+from provider_base import BaseProvider
 
-providerId = "fill_provider_id"
 
-def getProviderId():
-    return providerId
+class TemplatePlayingProvider(BaseProvider):
+    def __init__(self):
+        # Initialize your TTS client and instance here
+        # Example:
+        # client = YourTTSClient()
+        # tts = YourTTSEngine(client)
+        # super().__init__("template_playing", constants.VOICE_TYPE_EXTERNAL_PLAYING, tts)
+        raise NotImplementedError("Template provider - implement your TTS client")
 
-def getVoiceType():
-    return constants.VOICE_TYPE_EXTERNAL_PLAYING
+    def getSpeakData(self, text: str, voiceId: Optional[str] = None) -> bytes:
+        # This provider doesn't need to implement getSpeakData
+        raise NotImplementedError("This provider only supports playing")
 
-def getVoices():
-    list = []
-    # add supported voices
-    list.append({"id": "my-voice", "name": "My voice", "lang": "en"}) # optional boolean property "local" to determine of online/offline voice
-    return list
 
-def speak(text, voiceId=None):
-    # directly speak the text with the given voiceId
-    return
+# Create a singleton instance
+provider = TemplatePlayingProvider()
 
-def isSpeaking():
-    # return True if currently speaking
-    return False
-
-def stop():
-    # stop speaking
-    return
+# Export the interface functions
+getProviderId = provider.getProviderId
+getVoiceType = provider.getVoiceType
+getVoices = provider.getVoices
+speak = provider.speak
+isSpeaking = provider.isSpeaking
+stop = provider.stop

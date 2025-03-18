@@ -1,89 +1,84 @@
-import config
-import constants
-import util
+from typing import Optional, List, Dict, Any
+from provider_platform_data import provider as platform_provider
+from provider_test_data import provider as test_provider
 
-requiredFnsAll = ["getProviderId", "getVoiceType", "getVoices"]
-requiredFnsPlaying = ["speak", "isSpeaking", "stop"]
-requiredFnsData = ["getSpeakData"]
-requiredVoiceKeys = ["id", "name"]
+# List of all available providers
+providers = [
+    platform_provider,  # Platform-specific provider (eSpeak/AVSynth/SAPI)
+    test_provider,
+]
 
-speechProviders = {}
+# Try to load optional providers
+try:
+    from provider_elevenlabs_data import provider as elevenlabs_provider
 
-def speak(text, providerId, voiceId=None):
-    provider = speechProviders[providerId] if providerId in speechProviders else config.speechProviderList[0]
-    if not hasattr(provider, "speak"):
-        return print("ERROR: speech provider '{}' doesn't implement function 'speak'!".format(providerId))
-    provider.speak(text, voiceId)
+    providers.append(elevenlabs_provider)
+except ImportError:
+    print("Note: ElevenLabs provider not available (credentials missing)")
 
-def getSpeakData(text, providerId, voiceId=None):
-    if config.cacheData:
-        cachedData = util.getCacheData(text, providerId, voiceId)
-        if cachedData:
-            return cachedData
-    provider = speechProviders[providerId] if providerId in speechProviders else config.speechProviderList[0]
-    if not hasattr(provider, "getSpeakData"):
-        return print("ERROR: speech provider '{}' doesn't implement function 'getSpeakData'!".format(providerId))
-    data = provider.getSpeakData(text, voiceId)
-    if config.cacheData and data and len(data) > 0:
-        util.saveCacheData(text, providerId, voiceId, data)
-    return data
+try:
+    from provider_espeak_data import provider as espeak_provider
 
-def isSpeaking():
-    for provider in speechProviders.values():
-        if hasattr(provider, "isSpeaking") and provider.isSpeaking():
-            return True
-    return False
+    providers.append(espeak_provider)
+except Exception as e:
+    print("Note: eSpeak provider not available:", str(e))
 
-def stop():
-    for provider in speechProviders.values():
-        if hasattr(provider, "stop"):
-            provider.stop()
+# Default provider is the platform-specific one
+defaultProvider = platform_provider
 
-def getVoices():
-    allVoices = []
-    for provider in config.speechProviderList:
-        voices = provider.getVoices()
-        for voice in voices:
-            voice["providerId"] = provider.getProviderId()
-            voice["type"] = provider.getVoiceType()
-            voice["name"] = voice["name"] + ", " + provider.getProviderId()
-            allVoices.append(voice)
 
-    return allVoices
+def getVoices() -> List[Dict[str, Any]]:
+    """Get all available voices from all providers."""
+    voices = []
+    for provider in providers:
+        try:
+            providerVoices = provider.getVoices()
+            for voice in providerVoices:
+                voice["providerId"] = provider.getProviderId()
+                voice["type"] = provider.getVoiceType()
+                voices.append(voice)
+        except Exception as e:
+            provider_id = provider.getProviderId()
+            print(f"Error getting voices from provider {provider_id}: {str(e)}")
+    return voices
 
-def initProviders():
-    for provider in config.speechProviderList:
-        id = provider.getProviderId() if hasattr(provider, "getProviderId") else "fill_provider_id"
-        if id == "fill_provider_id":
-            raise Exception("ERROR: '{}' is an invalid provider ID!".format(id))
 
-        if id in speechProviders:
-            raise Exception("ERROR: duplicated speech provider with ID '{}'!".format(id))
+def getSpeakData(
+    text: str, voiceId: str, providerId: Optional[str] = None
+) -> Optional[bytes]:
+    """Get speech data for the given text and voice ID."""
+    if providerId is None:
+        providerId = defaultProvider.getProviderId()
 
-        for fnName in requiredFnsAll:
-            if not hasattr(provider, fnName):
-                raise Exception("ERROR: speech provider '{}' doesn't implement function '{}'!".format(id, fnName))
+    for provider in providers:
+        if provider.getProviderId() == providerId:
+            return provider.getSpeakData(text, voiceId)
+    return None
 
-        voiceType = provider.getVoiceType()
-        additionalRequiredFns = None
-        if voiceType == constants.VOICE_TYPE_EXTERNAL_PLAYING:
-            additionalRequiredFns = requiredFnsPlaying
-        elif voiceType == constants.VOICE_TYPE_EXTERNAL_DATA:
-            additionalRequiredFns = requiredFnsData
-        else:
-            raise Exception("ERROR: voice type of provider '{}' invalid (must be '{}' or '{}')!".format(id, constants.VOICE_TYPE_EXTERNAL_PLAYING, constants.VOICE_TYPE_EXTERNAL_DATA))
 
-        for fnName in additionalRequiredFns:
-            if not hasattr(provider, fnName):
-                raise Exception("ERROR: speech provider '{}' doesn't implement function '{}'!".format(id, fnName))
+def speak(text: str, providerId: str, voiceId: Optional[str] = None) -> None:
+    """Speak the given text using the specified provider and voice."""
+    if providerId not in [p.getProviderId() for p in providers]:
+        print(f"ERROR: Unknown speech provider '{providerId}'!")
+        return
 
-        voices = provider.getVoices()
-        for voice in voices:
-            name = voice["id"] or voice["name"] or "noVoiceName"
-            for key in requiredVoiceKeys:
-                if key not in voice:
-                    raise Exception("ERROR: voice '{}' of provider '{}' doesn't have required key '{}'!".format(name, id, key))
+    for provider in providers:
+        if provider.getProviderId() == providerId:
+            if voiceId:
+                provider.tts.set_voice(voiceId)
+            provider.tts.speak(text)
+            return
 
-        speechProviders[id] = provider # store in map
 
-initProviders()
+def initProviders() -> None:
+    """Initialize all speech providers."""
+    for provider in providers:
+        provider_id = provider.getProviderId()
+        if not all(
+            hasattr(provider, fn)
+            for fn in ["getProviderId", "getVoiceType", "getVoices"]
+        ):
+            print(
+                f"ERROR: speech provider '{provider_id}' is missing required functions!"
+            )
+            continue

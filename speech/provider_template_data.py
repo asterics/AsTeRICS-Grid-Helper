@@ -1,26 +1,30 @@
 # template for a speech provider returning binary data
 
 import constants
+from typing import Optional, List, Dict, Any
+from provider_base import BaseProvider
 
-providerId = "fill_provider_id"
 
-def getProviderId():
-    return providerId
+class TemplateDataProvider(BaseProvider):
+    def __init__(self):
+        # Initialize your TTS client and instance here
+        # Example:
+        # client = YourTTSClient()
+        # tts = YourTTSEngine(client)
+        # super().__init__("template_data", constants.VOICE_TYPE_EXTERNAL_DATA, tts)
+        raise NotImplementedError("Template provider - implement your TTS client")
 
-def getVoiceType():
-    return constants.VOICE_TYPE_EXTERNAL_DATA
+    def getSpeakData(self, text: str, voiceId: Optional[str] = None) -> bytes:
+        if voiceId:
+            self.tts.set_voice(voiceId)
+        return self.tts.synth_to_bytes(text)
 
-def getVoices():
-    list = []
-    # add supported voices
-    list.append({"id": "my-voice", "name": "My voice", "lang": "en"}) # optional boolean property "local" to determine of online/offline voice
-    return list
 
-def getSpeakData(text, voiceId=None):
-    # return byte array of data containing speech
-    # if your speech provider stores the speech data to file, you can use something like this:
-    # import util at the top
-    # path = util.getTempFileFullPath(providerId)
-    # os.system("shell command including <text> {} and <output-path> {}".format(text, path))
-    # return util.getTempFileData(providerId)
-    return None
+# Create a singleton instance
+provider = TemplateDataProvider()
+
+# Export the interface functions
+getProviderId = provider.getProviderId
+getVoiceType = provider.getVoiceType
+getVoices = provider.getVoices
+getSpeakData = provider.getSpeakData
