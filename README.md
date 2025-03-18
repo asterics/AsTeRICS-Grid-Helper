@@ -1,6 +1,55 @@
 # AsTeRICS-Grid-Helper
 Helper tools to enable [AsTeRICS Grid](https://github.com/asterics/AsTeRICS-Grid) to do actions on the operating system or integrations with external services, which aren't possible within the browser. Currently limited to provide speech from external sources.
 
+## Quick Start with Pre-built Binaries
+The easiest way to get started is to use our pre-built binaries. These are standalone executables that don't require Python installation:
+
+1. Download the appropriate binary for your platform from the [releases page](https://github.com/asterics/AsTeRICS-Grid-Helper/releases):
+   - Windows: `asterics-grid-speech.exe`
+   - macOS: `asterics-grid-speech-mac.app` or `asterics-grid-speech-mac`
+   - Linux: `asterics-grid-speech`
+
+2. Run the executable
+   - Windows: Double-click `asterics-grid-speech.exe`
+   - macOS: Double-click `asterics-grid-speech-mac.app` or run `./asterics-grid-speech-mac` in Terminal
+   - Linux: Run `./asterics-grid-speech` in Terminal
+
+3. The service will start automatically on port 5555
+
+4. In AsTeRICS Grid:
+   - Go to `Settings -> General Settings -> Advanced general settings`
+   - Set the `External speech service URL` to: `http://localhost:5555`
+   - Reload AsTeRICS Grid (`F5`)
+   - Go to `Settings -> User settings -> Voice` and enable `Show all voices`
+
+The service will automatically select the appropriate TTS engine for your platform:
+- Windows: SAPI (Windows Speech API)
+- macOS: AVSynth (macOS Text-to-Speech)
+- Linux: eSpeak-NG
+
+Note: The first run may take a few seconds as it initializes the speech engine.
+
+## Building from Source
+If you want to build the binaries yourself or modify the code:
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/asterics/AsTeRICS-Grid-Helper.git
+   cd AsTeRICS-Grid-Helper
+   ```
+
+2. Install Python 3.8 or later
+
+3. Run the build script:
+   ```bash
+   python build.py
+   ```
+
+4. The executable will be created in the `dist` directory:
+   - Windows: `dist/asterics-grid-speech.exe`
+   - macOS: `dist/asterics-grid-speech-mac.app` and `dist/asterics-grid-speech-mac`
+   - Linux: `dist/asterics-grid-speech`
+
 ## Speech
 Normally AsTeRICS Grid uses the [Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API) and therefore voices that are installed on the operating system (e.g. SAPI voices on Windows, or voices that are coming from a TTS module on Android). Sometimes it's interesting to use voices, which aren't available as system voices. This section describes how to use an external custom speech service using Python.
 
@@ -27,9 +76,8 @@ Normally AsTeRICS Grid uses the [Web Speech API](https://developer.mozilla.org/e
    * **type "playing"**: a speech provider where playing the audio file is done internally. Using a speech provider of this type only makes sense, if it's used on the same machine as AsTeRICS Grid.
    * **type "data"**: a speech provider that generates the speech audio data, which then is used by AsTeRICS Grid and played within the browser. This type is preferable, because it makes it possible to run the speech service on any device or server and also allows caching of the data.
 
-### Installation and Usage
-#### Speech Service
-These steps are necessary to start the speech service that can be used by AsTeRICS Grid:
+### Manual Installation and Usage
+If you prefer to run the service directly without using pre-built binaries:
 
 1. Install Python dependencies:
    ```bash
@@ -65,20 +113,7 @@ These steps are necessary to start the speech service that can be used by AsTeRI
    python speech/start.py
    ```
 
-The service will automatically select the appropriate TTS engine based on your platform:
-- Linux: eSpeak-NG
-- macOS: AVSynth
-- Windows: SAPI
-
-#### AsTeRICS Grid
-In AsTeRICS Grid do the following steps to use the external speech provider:
-* Go to `Settings -> General Settings -> Advanced general settings`
-* Configure the `External speech service URL` with the IP/host where the API is running, port `5555`. If the speech service is running on the same computer, use `http://localhost:5555`.
-* Reload AsTeRICS Grid (`F5`)
-* Go to `Settings -> User settings -> Voice` and enable `Show all voices`
-* Verify that the additional voices are selectable and working.
-
-#### Caching
+### Caching
 For speech providers with type "data", all generated speech data is automatically cached to the folder `speech/temp`. If you want to cache speech data for a whole AsTeRICS Grid configuration follow these steps:
 * configure AsTeRICS Grid to use your desired speech provider / voice (see steps above)
 * go to `Settings -> User settings -> Voice -> Advanced voice settings` and click the button `Cache all texts of current configuration using external voice`. This operation may take some time for big AsTeRICS Grid configurations.
