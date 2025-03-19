@@ -2,7 +2,7 @@
 
 import os
 import sys
-from flask import Flask, jsonify, request, make_response, send_file
+from flask import Flask, jsonify, send_file
 from flask_cors import CORS
 from urllib.parse import unquote
 from io import BytesIO

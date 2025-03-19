@@ -1,6 +1,5 @@
 # template for a speech provider that directly plays speech
 
-import constants
 from typing import Optional
 from provider_base import BaseProvider
 

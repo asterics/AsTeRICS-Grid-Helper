@@ -1,7 +1,6 @@
 # template for a speech provider returning binary data
 
-import constants
-from typing import Optional, List, Dict, Any
+from typing import Optional
 from provider_base import BaseProvider
 
 

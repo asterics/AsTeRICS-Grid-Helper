@@ -4,11 +4,14 @@ import constants
 engine = pyttsx3.init()
 speaking = False
 
+
 def getProviderId():
     return "pytts_playing"
 
+
 def getVoiceType():
     return constants.VOICE_TYPE_EXTERNAL_PLAYING
+
 
 def speak(text, voiceId=None):
     global speaking
@@ -25,16 +28,19 @@ def speak(text, voiceId=None):
     engine.endLoop()
     speaking = False
 
+
 def isSpeaking():
     # return engine.isBusy() # always returns True on Windows?!
     return speaking
 
+
 def stop():
     engine.stop()
 
+
 def getVoices():
     list = []
-    voices = engine.getProperty('voices')
+    voices = engine.getProperty("voices")
     for voice in voices:
         list.append({"id": voice.id, "name": voice.name})
 
