@@ -6,7 +6,7 @@ import os
 import sys
 from urllib.parse import unquote
 
-from flask import Flask, jsonify, send_file
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from flask_restx import Api, Resource, fields
 
@@ -44,6 +44,40 @@ api = Api(
 
 # Define namespaces
 ns = api.namespace("", description="Speech synthesis operations")
+
+# Define models
+root_response = api.model(
+    "RootResponse",
+    {
+        "name": fields.String(description="API name"),
+        "version": fields.String(description="API version"),
+        "description": fields.String(description="API description"),
+        "documentation": fields.String(description="Link to API documentation"),
+        "endpoints": fields.Raw(description="Available API endpoints"),
+    },
+)
+
+
+@ns.route("/")
+class Root(Resource):
+    @ns.doc("get_root")
+    @ns.response(200, "Success", root_response)
+    def get(self):
+        """Return basic API information and documentation link."""
+        return {
+            "name": "AsTeRICS Grid Speech API",
+            "version": "1.0",
+            "description": "API for text-to-speech functionality in AsTeRICS Grid",
+            "documentation": "/docs",
+            "endpoints": {
+                "voices": "/voices",
+                "speak": "/speak/<text>/<provider_id>/<voice_id>",
+                "speakdata": "/speakdata/<text>/<provider_id>/<voice_id>",
+                "speaking": "/speaking",
+                "stop": "/stop",
+            },
+        }
+
 
 # Define models
 voice_model = api.model(
@@ -104,6 +138,9 @@ init_providers()
 @app.errorhandler(Exception)
 def handle_error(error):
     """Handle all exceptions and return them as JSON responses."""
+    # Let Flask-RESTX handle its own routes
+    if hasattr(error, "code") and error.code == 404 and request.path.startswith("/"):
+        return error
     logger.error(f"Error: {error!s}", exc_info=True)
     return jsonify({"error": str(error), "status": "error"}), 200
 
@@ -123,17 +160,22 @@ class Voices(Resource):
             return {"error": str(e), "status": "error", "voices": []}, 200
 
 
+@ns.route("/speakdata/<string:text>")
+@ns.route("/speakdata/<string:text>/<string:provider_id>")
 @ns.route("/speakdata/<string:text>/<string:provider_id>/<string:voice_id>")
 class SpeakData(Resource):
     @ns.doc("get_speak_data")
     @ns.param("text", "Text to convert to speech")
-    @ns.param("provider_id", "TTS provider ID")
-    @ns.param("voice_id", "Voice ID to use")
+    @ns.param("provider_id", "TTS provider ID", required=False)
+    @ns.param("voice_id", "Voice ID to use", required=False)
     @ns.response(200, "Success")
     @ns.response(500, "Error", error_response)
-    def get(self, text: str, provider_id: str, voice_id: str):
+    def get(self, text: str, provider_id: str = "", voice_id: str = ""):
         """Get speech data for text."""
         try:
+            text = unquote(text).lower()
+            provider_id = unquote(provider_id)
+            voice_id = unquote(voice_id)
             data = get_speak_data(text, voice_id, provider_id)
             if data is None:
                 return {
@@ -150,23 +192,36 @@ class SpeakData(Resource):
             logger.error(f"Error in /speakdata endpoint: {e!s}", exc_info=True)
             return {"error": str(e), "status": "error"}, 200
 
+    def post(self, text: str, provider_id: str = "", voice_id: str = ""):
+        """POST method for speakdata endpoint."""
+        return self.get(text, provider_id, voice_id)
 
+
+@ns.route("/speak/<string:text>")
+@ns.route("/speak/<string:text>/<string:provider_id>")
 @ns.route("/speak/<string:text>/<string:provider_id>/<string:voice_id>")
 class Speak(Resource):
     @ns.doc("speak_text")
     @ns.param("text", "Text to speak")
-    @ns.param("provider_id", "TTS provider ID")
-    @ns.param("voice_id", "Voice ID to use")
+    @ns.param("provider_id", "TTS provider ID", required=False)
+    @ns.param("voice_id", "Voice ID to use", required=False)
     @ns.response(200, "Success", success_response)
     @ns.response(500, "Error", error_response)
-    def get(self, text: str, provider_id: str, voice_id: str):
+    def get(self, text: str, provider_id: str = "", voice_id: str = ""):
         """Speak text using specified voice."""
         try:
+            text = unquote(text).lower()
+            provider_id = unquote(provider_id)
+            voice_id = unquote(voice_id)
             speak(text, provider_id, voice_id)
             return {"status": "success"}
         except Exception as e:
             logger.error(f"Error in /speak endpoint: {e!s}", exc_info=True)
             return {"error": str(e), "status": "error"}, 200
+
+    def post(self, text: str, provider_id: str = "", voice_id: str = ""):
+        """POST method for speak endpoint."""
+        return self.get(text, provider_id, voice_id)
 
 
 @app.route("/cache/<text>/<provider_id>/<voice_id>", methods=["POST", "GET"])
@@ -209,6 +264,10 @@ class Stop(Resource):
         except Exception as e:
             logger.error(f"Error in /stop endpoint: {e!s}", exc_info=True)
             return {"error": str(e), "status": "error"}, 200
+
+    def post(self):
+        """POST method for stop endpoint."""
+        return self.get()
 
 
 def start_server(host: str = "127.0.0.1", port: int = 5555) -> None:
