@@ -1,41 +1,7 @@
 import os
 import platform
 import subprocess
-import sys
 from pathlib import Path
-import site
-
-
-def find_package_path(package_name):
-    """Find the installation path of a package"""
-    for path in site.getsitepackages():
-        package_path = os.path.join(path, package_name)
-        if os.path.exists(package_path):
-            return package_path
-    return None
-
-
-def install_requirements():
-    """Install required packages for building"""
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
-    subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "flask", "flask_cors"]
-    )
-
-    # Install only the platform-specific TTS engine
-    current_platform = platform.system().lower()
-    if current_platform == "darwin":
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "py3-tts-wrapper[avsynth]"]
-        )
-    elif current_platform == "windows":
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "py3-tts-wrapper[sapi]"]
-        )
-    else:  # linux
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "py3-tts-wrapper[espeak]"]
-        )
 
 
 def build_executable():
@@ -52,7 +18,6 @@ def build_executable():
                 if os.path.exists("speech/assets/icon.icns")
                 else None
             ),
-            "engine": "avsynth",
         },
         "windows": {
             "name": "asterics-grid-speech.exe",
@@ -61,7 +26,6 @@ def build_executable():
                 if os.path.exists("speech/assets/icon.ico")
                 else None
             ),
-            "engine": "sapi",
         },
         "linux": {
             "name": "asterics-grid-speech",
@@ -70,30 +34,13 @@ def build_executable():
                 if os.path.exists("speech/assets/icon.png")
                 else None
             ),
-            "engine": "espeak",
         },
     }
 
     options = platform_options.get(
         current_platform,
-        {"name": "asterics-grid-speech", "icon": None, "engine": None},
+        {"name": "asterics-grid-speech", "icon": None},
     )
-
-    # Find the tts_wrapper package path
-    tts_wrapper_path = find_package_path("tts_wrapper")
-    if tts_wrapper_path:
-        # Include the entire tts_wrapper package
-        data_option = f"{tts_wrapper_path}{os.pathsep}tts_wrapper"
-
-        # Include the specific engine files
-        engine_path = os.path.join(tts_wrapper_path, "engines", options["engine"])
-        if os.path.exists(engine_path):
-            engine_option = (
-                f"{engine_path}{os.pathsep}tts_wrapper/engines/{options['engine']}"
-            )
-    else:
-        data_option = None
-        engine_option = None
 
     # Base PyInstaller command
     cmd = [
@@ -105,15 +52,9 @@ def build_executable():
         "--clean",  # Clean PyInstaller cache
         "--add-data",
         "speech/temp:temp",  # Include temp directory
+        "--add-data",
+        "speech/cache:cache",  # Include cache directory
     ]
-
-    # Add tts_wrapper package if found
-    if data_option:
-        cmd.extend(["--add-data", data_option])
-
-    # Add engine files if found
-    if engine_option:
-        cmd.extend(["--add-data", engine_option])
 
     # Add platform-specific options
     if options["icon"]:
@@ -135,8 +76,6 @@ def build_executable():
             "wit",
             "--exclude-module",
             "elevenlabs",
-            "--exclude-module",
-            "sherpa_onnx",
             "speech/start.py",
         ]
     )
@@ -153,7 +92,7 @@ def build_executable():
             """AsTeRICS Grid Speech Service
 ===========================
 
-This is a standalone speech service for AsTeRICS Grid.
+This is a standalone speech service for AsTeRICS Grid using Sherpa-ONNX for offline text-to-speech.
 
 Usage:
 1. Run the executable
@@ -163,21 +102,46 @@ Usage:
 5. Reload AsTeRICS Grid (F5)
 6. Go to Settings -> User settings -> Voice and enable "Show all voices"
 
-The service will automatically select the appropriate TTS engine for your platform:
-- Windows: SAPI (Windows Speech API)
-- macOS: AVSynth (macOS Text-to-Speech)
-- Linux: eSpeak-NG
+Available Voices:
+- en-us-amy-medium: English (US) - Amy (Medium)
+- en-us-amy-low: English (US) - Amy (Low)
+- en-us-amy-high: English (US) - Amy (High)
+- en-us-ryan-medium: English (US) - Ryan (Medium)
+- en-us-ryan-low: English (US) - Ryan (Low)
+- en-us-ryan-high: English (US) - Ryan (High)
 
-Note: The first run may take a few seconds as it initializes the speech engine.
+Note: The first run may take a few seconds as it downloads and initializes the Sherpa-ONNX model.
+"""
+        )
+
+    # Create a simple config file in the dist directory
+    config_path = dist_dir / "config.py"
+    with open(config_path, "w") as f:
+        f.write(
+            """# Default configuration for AsTeRICS Grid Speech Service
+
+# TTS Configuration
+TTS_CONFIG = {
+    "tts_provider": "sherpa-onnx",  # Default provider
+    "cache_enabled": True,
+    "cache_dir": "cache",
+    "cache_ttl": 3600,  # Cache TTL in seconds
+}
+
+# Voice configuration
+VOICE_CONFIG = {
+    "default_voice": "en-us-amy-medium",
+    "fallback_voice": "en-us-ryan-medium"
+}
+
+# No credentials needed for Sherpa-ONNX
+CREDENTIALS = {}
 """
         )
 
 
 def main():
     """Main build process"""
-    print("Installing requirements...")
-    install_requirements()
-
     print("Building executable...")
     build_executable()
 
