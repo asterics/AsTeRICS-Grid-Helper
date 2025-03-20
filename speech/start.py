@@ -2,8 +2,6 @@
 
 import io
 import logging
-import os
-import sys
 from urllib.parse import unquote
 
 from flask import Flask, jsonify, request, send_file
@@ -12,26 +10,27 @@ from flask_restx import Api, Resource, fields
 
 from .config import CACHE_ENABLED
 from .speech_manager import (
+    SpeechManager,
     get_speak_data,
     get_voices,
-    init_providers,
     is_speaking,
     speak,
     stop_speaking,
 )
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Add the parent directory to the Python path
-current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if current_dir not in sys.path:
-    sys.path.insert(0, current_dir)
+# HTTP status codes
+HTTP_NOT_FOUND = 404
 
 app = Flask(__name__)
 app.url_map.strict_slashes = False
 CORS(app)
+
+# Create speech manager instance
+speech_manager = SpeechManager()
 
 # Initialize Flask-RESTX
 api = Api(
@@ -40,6 +39,7 @@ api = Api(
     title="AsTeRICS Grid Speech API",
     description="API for text-to-speech functionality in AsTeRICS Grid",
     doc="/docs",
+    prefix="/api",  # Add a prefix to avoid conflicts with Flask routes
 )
 
 # Define namespaces
@@ -130,16 +130,17 @@ speaking_response = api.model(
     },
 )
 
-# Initialize speech provider
-init_providers()
-
 
 # Error handler for all exceptions
 @app.errorhandler(Exception)
 def handle_error(error):
     """Handle all exceptions and return them as JSON responses."""
     # Let Flask-RESTX handle its own routes
-    if hasattr(error, "code") and error.code == 404 and request.path.startswith("/"):
+    if (
+        hasattr(error, "code")
+        and error.code == HTTP_NOT_FOUND
+        and request.path.startswith("/")
+    ):
         return error
     logger.error(f"Error: {error!s}", exc_info=True)
     return jsonify({"error": str(error), "status": "error"}), 200
@@ -151,9 +152,9 @@ class Voices(Resource):
     @ns.response(200, "Success", voices_response)
     @ns.response(500, "Error", error_response)
     def get(self):
-        """Get available voices."""
+        """Get available voices from all providers."""
         try:
-            voices = get_voices()
+            voices = get_voices(speech_manager)
             return {"voices": voices, "status": "success"}
         except Exception as e:
             logger.error(f"Error in /voices endpoint: {e!s}", exc_info=True)
@@ -176,7 +177,7 @@ class SpeakData(Resource):
             text = unquote(text).lower()
             provider_id = unquote(provider_id)
             voice_id = unquote(voice_id)
-            data = get_speak_data(text, voice_id, provider_id)
+            data = get_speak_data(text, voice_id, provider_id, speech_manager)
             if data is None:
                 return {
                     "error": "Failed to generate speech data",
@@ -213,7 +214,7 @@ class Speak(Resource):
             text = unquote(text).lower()
             provider_id = unquote(provider_id)
             voice_id = unquote(voice_id)
-            speak(text, provider_id, voice_id)
+            speak(text, provider_id, voice_id, speech_manager)
             return {"status": "success"}
         except Exception as e:
             logger.error(f"Error in /speak endpoint: {e!s}", exc_info=True)
@@ -232,7 +233,7 @@ def cache_data(text: str, provider_id: str = "", voice_id: str = ""):
     text = unquote(text).lower()
     provider_id = unquote(provider_id)
     voice_id = unquote(voice_id)
-    get_speak_data(text, voice_id, provider_id)
+    get_speak_data(text, voice_id, provider_id, speech_manager)
     return jsonify(True)
 
 
@@ -244,7 +245,7 @@ class Speaking(Resource):
     def get(self):
         """Check if text is being spoken."""
         try:
-            speaking = is_speaking()
+            speaking = is_speaking(speech_manager)
             return {"speaking": speaking, "status": "success"}
         except Exception as e:
             logger.error(f"Error in /speaking endpoint: {e!s}", exc_info=True)
@@ -259,7 +260,7 @@ class Stop(Resource):
     def get(self):
         """Stop speaking."""
         try:
-            stop_speaking()
+            stop_speaking(speech_manager)
             return {"status": "success"}
         except Exception as e:
             logger.error(f"Error in /stop endpoint: {e!s}", exc_info=True)
@@ -270,10 +271,22 @@ class Stop(Resource):
         return self.get()
 
 
-def start_server(host: str = "127.0.0.1", port: int = 5555) -> None:
+def start_server():
     """Start the Flask server."""
-    init_providers()
-    app.run(host=host, port=port)
+    try:
+        # Initialize speech providers
+        speech_manager.init_providers()
+
+        # Start Flask server
+        app.run(
+            host="127.0.0.1",
+            port=5555,
+            debug=True,  # Keep debug mode for error reporting
+            use_reloader=False,  # Disable the reloader to prevent double initialization
+        )
+    except Exception as e:
+        logger.error(f"Failed to start server: {e}")
+        raise
 
 
 if __name__ == "__main__":
