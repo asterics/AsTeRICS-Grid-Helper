@@ -2,21 +2,48 @@
 
 import io
 import logging
+import os
+import sys
 from urllib.parse import unquote
+import tempfile
+import json
 
+# Flask imports
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from flask_restx import Api, Resource, fields
 
-from .config import CACHE_ENABLED
-from .speech_manager import (
-    SpeechManager,
-    get_speak_data,
-    get_voices,
-    is_speaking,
-    speak,
-    stop_speaking,
-)
+# Add the parent directory to sys.path for imports when running as executable
+if getattr(sys, "frozen", False):
+    # we are running in a bundle
+    bundle_dir = sys._MEIPASS
+else:
+    # we are running in a normal Python environment
+    bundle_dir = os.path.dirname(os.path.abspath(__file__))
+
+sys.path.append(os.path.dirname(bundle_dir))
+
+try:
+    from speech.config import CACHE_ENABLED
+    from speech.speech_manager import (
+        SpeechManager,
+        get_speak_data,
+        get_voices,
+        is_speaking,
+        speak,
+        stop_speaking,
+    )
+except ImportError:
+    # Fallback for when running as module
+    from config import CACHE_ENABLED
+    from speech_manager import (
+        SpeechManager,
+        get_speak_data,
+        get_voices,
+        is_speaking,
+        speak,
+        stop_speaking,
+    )
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -281,8 +308,8 @@ def start_server():
         app.run(
             host="127.0.0.1",
             port=5555,
-            debug=True,  # Keep debug mode for error reporting
-            use_reloader=False,  # Disable the reloader to prevent double initialization
+            debug=False,  # Disable debug mode
+            use_reloader=False,  # Disable the reloader
         )
     except Exception as e:
         logger.error(f"Failed to start server: {e}")
