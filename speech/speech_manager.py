@@ -54,20 +54,29 @@ class TTSProvider(CustomTTSProvider):
     def get_speak_data(self, text: str, voice_id: str) -> bytes:
         """Get WAV audio data for text."""
         try:
-            # Get raw PCM audio data as bytes
-            audio_data = self.tts.synth_to_bytes(text, voice_id=voice_id)
+            import tempfile
+            import os
 
-            # Try to get word timings if available
+            # Create a temporary WAV file
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+                temp_path = temp_file.name
+
             try:
-                if hasattr(self.tts, "get_word_timings"):
-                    self.timings = self.tts.get_word_timings()
-                elif hasattr(self.tts, "word_timings"):
-                    self.timings = self.tts.word_timings
-            except Exception as e:
-                self.logger.debug(f"Could not get word timings: {e}")
-                self.timings = []
+                # Synthesize to WAV file
+                self.tts.synth_to_file(text, temp_path, voice_id=voice_id)
 
-            return audio_data
+                # Read the WAV file
+                with open(temp_path, "rb") as f:
+                    wav_data = f.read()
+
+                return wav_data
+            finally:
+                # Clean up temp file
+                try:
+                    os.unlink(temp_path)
+                except Exception as e:
+                    self.logger.debug(f"Error cleaning up temp file: {e}")
+
         except Exception as e:
             self.logger.error(f"Error getting speech data: {e}")
             return b""
