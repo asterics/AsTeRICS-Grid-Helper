@@ -29,12 +29,27 @@ AVAILABLE_ENGINES = {
     "sherpaonnx": EngineInfo(
         name="sherpaonnx",
         display_name="Sherpa-ONNX",
-        description="Open-source offline TTS engine using ONNX models (works with default configuration)",
+        description=(
+            "Open-source offline TTS engine using ONNX models "
+            "(works with default configuration)"
+        ),
         is_offline=True,
         required_fields=[],
         help_text={
             "model_path": "Optional: Path to custom ONNX model file",
             "tokens_path": "Optional: Path to custom tokens file",
+        },
+    ),
+    "openai": EngineInfo(
+        name="openai",
+        display_name="OpenAI TTS",
+        description="OpenAI's GPT-4o mini TTS with high-quality voices",
+        is_offline=False,
+        required_fields=["api_key"],
+        help_text={
+            "api_key": "Your OpenAI API key",
+            "model": ("Model to use (default: gpt-4o-mini-tts)"),
+            "output_format": ("Output format (default: wav)"),
         },
     ),
     "microsoft": EngineInfo(

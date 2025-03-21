@@ -27,10 +27,6 @@ git clone https://github.com/yourusername/AsTeRICS-Grid-Helper.git
 cd AsTeRICS-Grid-Helper
 ```
 
-2. Install dependencies using `uv`:
-```bash
-uv pip install -r requirements.txt
-```
 
 ## Usage
 
@@ -155,6 +151,143 @@ CREDENTIALS = {
     }
 }
 ```
+
+## Creating Custom TTS Providers
+
+The system supports custom TTS providers through a simple interface. This allows you to integrate any TTS engine that can be controlled via command line or API.
+
+### Provider Interface
+
+To create a custom provider, create a new class that inherits from `CustomTTSProvider` in `speech/custom_providers.py`:
+
+```python
+from speech.speech_manager import CustomTTSProvider
+
+class MyCustomProvider(CustomTTSProvider):
+    def __init__(self, config: dict[str, Any] | None = None):
+        super().__init__()
+        self.config = config or {}
+        # Initialize your TTS engine here
+
+    def get_voices(self) -> list[dict[str, Any]]:
+        """Return list of available voices."""
+        # Return list of dicts with keys: id, name, language_codes, gender
+        return []
+
+    def speak(self, text: str, voice_id: str) -> None:
+        """Speak text using specified voice."""
+        # Implement direct speech output
+        pass
+
+    def get_speak_data(self, text: str, voice_id: str) -> bytes:
+        """Get WAV audio data for text."""
+        # Return WAV format audio data
+        return b""
+
+    def stop_speaking(self) -> None:
+        """Stop current speech playback."""
+        # Implement stop functionality
+        pass
+```
+
+### Registering Your Provider
+
+Add an initialization method to `SpeechManager` in `speech/speech_manager.py`:
+
+```python
+def init_myprovider_provider(self, config: dict[str, Any]) -> CustomTTSProvider | None:
+    """Initialize your custom provider."""
+    try:
+        from .custom_providers import MyCustomProvider
+        return MyCustomProvider(config)
+    except Exception as e:
+        self.logger.error(f"Failed to initialize MyProvider: {e}")
+        return None
+```
+
+### Configuration
+
+Add your provider to `speech.ini`:
+
+```ini
+[engines]
+engines = myprovider,espeak
+
+[engine_configs]
+myprovider_path = /path/to/myprovider
+myprovider_data_dir = /path/to/data
+```
+
+### Example Implementations
+
+#### OpenAI TTS Provider
+
+The OpenAI TTS provider demonstrates integration with OpenAI's text-to-speech API:
+
+```ini
+[engines]
+engines = openai
+
+[engine_configs]
+openai_api_key = your-api-key
+openai_model = gpt-4o-mini-tts
+openai_output_format = wav
+```
+
+Features:
+- Uses OpenAI's GPT-4o mini TTS model
+- Supports 11 built-in voices (alloy, ash, ballad, coral, echo, fable, onyx, nova, sage, shimmer)
+- Optimized for English but supports multiple languages
+- High-quality, natural-sounding speech
+- Streaming support for real-time playback
+
+To use the OpenAI provider:
+
+1. Get an API key from [OpenAI](https://platform.openai.com)
+2. Set the `OPENAI_API_KEY` environment variable or add it to your config
+3. Select a voice from the available options
+4. Use the provider as normal
+
+Example usage:
+```python
+from speech.speech_manager import SpeechManager
+from speech.config import get_tts_config
+
+# Initialize with OpenAI
+config = get_tts_config()
+config["engines"] = ["openai"]
+config["engine_configs"] = {
+    "openai": {
+        "api_key": "your-api-key",
+        "model": "gpt-4o-mini-tts",
+        "output_format": "wav"
+    }
+}
+
+speech_manager = SpeechManager()
+speech_manager.init_providers(config)
+
+# Get available voices
+voices = speech_manager.get_voices()
+for voice in voices:
+    print(f"- {voice['name']} ({voice['language_codes'][0]})")
+
+# Speak text
+speech_manager.speak("Hello, this is a test.", "alloy")
+```
+
+Note: The OpenAI TTS service requires an API key and may incur costs based on usage. See [OpenAI's pricing](https://openai.com/pricing) for details.
+
+#### Template Provider
+
+The `TemplateProvider` class in `speech/custom_providers.py` provides a base template for implementing new TTS providers. It includes:
+
+1. Basic provider structure
+2. Required method signatures
+3. Type hints and documentation
+4. Error handling patterns
+
+Use this template as a starting point for implementing new providers.
 
 ## Development
 
