@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AsTeRICS Grid Speech - Test TTS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .voice-card {
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+        .voice-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .voice-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .test-controls {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 1rem;
+            border-bottom: 1px solid #dee2e6;
+            z-index: 100;
+        }
+        .audio-player {
+            width: 100%;
+            margin-top: 1rem;
+        }
+        #speakingStatus {
+            display: none;
+            margin-top: 1rem;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            background-color: #e9ecef;
+        }
+        #speakingStatus.active {
+            display: block;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .endpoint-selector {
+            margin-bottom: 1rem;
+        }
+        .endpoint-info {
+            font-size: 0.875rem;
+            color: #6c757d;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">AsTeRICS Grid Speech</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Configuration</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/test">Test TTS</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/docs">API Documentation</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <!-- Left Column: Voice List -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Available Voices</h5>
+                        <div class="mt-2">
+                            <input type="text" class="form-control" id="voiceSearch" placeholder="Search voices by name, language, or engine...">
+                        </div>
+                    </div>
+                    <div class="card-body voice-list" id="voiceList">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading voices...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Test Controls -->
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Test Text-to-Speech</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="testForm">
+                            <div class="endpoint-selector">
+                                <label class="form-label">Select Endpoint:</label>
+                                <div class="btn-group w-100" role="group">
+                                    <input type="radio" class="btn-check" name="endpoint" id="endpoint_speak" value="speak" checked>
+                                    <label class="btn btn-outline-primary" for="endpoint_speak">
+                                        <i class="bi bi-volume-up"></i> Speak
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="endpoint" id="endpoint_speakdata" value="speakdata">
+                                    <label class="btn btn-outline-primary" for="endpoint_speakdata">
+                                        <i class="bi bi-file-earmark-music"></i> Audio Stream
+                                    </label>
+                                </div>
+                                <div class="endpoint-info" id="endpointInfo">
+                                    /speak: Directly plays audio through system speakers
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="testText" class="form-label">Text to Speak</label>
+                                <textarea class="form-control" id="testText" rows="3" placeholder="Enter text to speak...">Hello! This is a test of the text-to-speech system.</textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Selected Voice: <span id="selectedVoice">None selected</span></label>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary" id="speakButton">
+                                    <i class="bi bi-play-fill"></i> Speak
+                                </button>
+                                <button type="button" class="btn btn-danger" id="stopButton" disabled>
+                                    <i class="bi bi-stop-fill"></i> Stop
+                                </button>
+                            </div>
+
+                            <div id="speakingStatus" class="text-center">
+                                <i class="bi bi-soundwave"></i> Speaking...
+                            </div>
+
+                            <audio id="audioPlayer" class="audio-player" controls style="display: none;">
+                                Your browser does not support the audio element.
+                            </audio>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let selectedVoiceId = null;
+        let isSpeaking = false;
+        let speakingCheckInterval = null;
+        let allVoices = []; // Store all voices for filtering
+
+        // Filter voices based on search input
+        function filterVoices(searchTerm) {
+            const voiceList = document.getElementById('voiceList');
+            const normalizedSearch = searchTerm.toLowerCase().trim();
+            
+            if (!normalizedSearch) {
+                // Show all voices if search is empty
+                displayVoices(allVoices);
+                return;
+            }
+
+            const filteredVoices = allVoices.filter(voice => {
+                return voice.name.toLowerCase().includes(normalizedSearch) ||
+                       (voice.language_codes && voice.language_codes.some(lang => lang.toLowerCase().includes(normalizedSearch))) ||
+                       voice.providerId.toLowerCase().includes(normalizedSearch) ||
+                       voice.gender.toLowerCase().includes(normalizedSearch);
+            });
+
+            displayVoices(filteredVoices);
+        }
+
+        // Display voices in the list
+        function displayVoices(voices) {
+            const voiceList = document.getElementById('voiceList');
+            
+            if (voices.length === 0) {
+                voiceList.innerHTML = `
+                    <div class="alert alert-warning">
+                        No voices match your search. Try different keywords.
+                    </div>
+                `;
+                return;
+            }
+
+            voiceList.innerHTML = '';
+            voices.forEach(voice => {
+                const card = document.createElement('div');
+                card.className = 'card voice-card';
+                card.innerHTML = `
+                    <div class="card-body">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="voice" 
+                                   id="voice_${voice.id}" value="${voice.id}">
+                            <label class="form-check-label" for="voice_${voice.id}">
+                                <strong>${voice.name}</strong><br>
+                                <small class="text-muted">
+                                    ${voice.language_codes ? voice.language_codes[0] : 'Unknown'} (${voice.gender})<br>
+                                    <span class="badge bg-secondary">${voice.providerId}</span>
+                                </small>
+                            </label>
+                        </div>
+                    </div>
+                `;
+                voiceList.appendChild(card);
+
+                // Add click handler
+                card.querySelector('input[type="radio"]').addEventListener('change', (e) => {
+                    selectedVoiceId = e.target.value;
+                    document.getElementById('selectedVoice').textContent = `${voice.name} (${voice.providerId})`;
+                });
+            });
+        }
+
+        // Load available voices
+        async function loadVoices() {
+            try {
+                const response = await fetch('/api/voices');
+                const data = await response.json();
+                
+                if (data.status === 'error') {
+                    throw new Error(data.error || 'Failed to load voices');
+                }
+                
+                const voices = data.voices;
+                if (!voices || !Array.isArray(voices)) {
+                    throw new Error('Invalid voice data received');
+                }
+
+                if (voices.length === 0) {
+                    document.getElementById('voiceList').innerHTML = `
+                        <div class="alert alert-warning">
+                            No voices available. Please enable and configure TTS engines in the configuration page.
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Store all voices and display them
+                allVoices = voices;
+                displayVoices(voices);
+
+            } catch (error) {
+                console.error('Error loading voices:', error);
+                document.getElementById('voiceList').innerHTML = `
+                    <div class="alert alert-danger">
+                        <p>Failed to load voices: ${error.message}</p>
+                        <small>Please check if the service is running and TTS engines are properly configured.</small>
+                    </div>
+                `;
+            }
+        }
+
+        // Add search input handler with debounce
+        let searchTimeout;
+        document.getElementById('voiceSearch').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                filterVoices(e.target.value);
+            }, 300); // Wait 300ms after user stops typing
+        });
+
+        // Update endpoint info when selection changes
+        document.querySelectorAll('input[name="endpoint"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const info = {
+                    'speak': '/speak: Directly plays audio through system speakers',
+                    'speakdata': '/speakdata: Returns audio data as a stream'
+                };
+                document.getElementById('endpointInfo').textContent = info[e.target.value];
+                
+                // Show/hide audio player based on endpoint
+                document.getElementById('audioPlayer').style.display = 
+                    e.target.value === 'speakdata' ? 'block' : 'none';
+            });
+        });
+
+        // Handle form submission
+        document.getElementById('testForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!selectedVoiceId) {
+                alert('Please select a voice first.');
+                return;
+            }
+
+            const text = document.getElementById('testText').value.trim();
+            if (!text) {
+                alert('Please enter some text to speak.');
+                return;
+            }
+
+            const endpoint = document.querySelector('input[name="endpoint"]:checked').value;
+            const speakButton = document.getElementById('speakButton');
+            const stopButton = document.getElementById('stopButton');
+            const speakingStatus = document.getElementById('speakingStatus');
+            const audioPlayer = document.getElementById('audioPlayer');
+
+            speakButton.disabled = true;
+            stopButton.disabled = false;
+
+            try {
+                if (endpoint === 'speak') {
+                    // Direct speak endpoint
+                    const encodedText = encodeURIComponent(text);
+                    const selectedVoice = allVoices.find(v => v.id === selectedVoiceId);
+                    await fetch(`/api/speak/${encodedText}/${selectedVoice.providerId}/${selectedVoiceId}`, {
+                        method: 'POST'
+                    });
+
+                    // Start checking speaking status
+                    isSpeaking = true;
+                    speakingStatus.classList.add('active');
+                    speakingCheckInterval = setInterval(async () => {
+                        const statusResponse = await fetch('/api/speaking');
+                        const status = await statusResponse.json();
+                        if (!status.speaking) {
+                            clearInterval(speakingCheckInterval);
+                            isSpeaking = false;
+                            speakingStatus.classList.remove('active');
+                            speakButton.disabled = false;
+                            stopButton.disabled = true;
+                        }
+                    }, 500);
+
+                } else {
+                    // Audio stream endpoint
+                    const encodedText = encodeURIComponent(text);
+                    const selectedVoice = allVoices.find(v => v.id === selectedVoiceId);
+                    const response = await fetch(`/api/speakdata/${encodedText}/${selectedVoice.providerId}/${selectedVoiceId}`, {
+                        method: 'POST'
+                    });
+
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    audioPlayer.src = url;
+                    audioPlayer.play();
+                    
+                    speakButton.disabled = false;
+                    stopButton.disabled = true;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while trying to speak.');
+                speakButton.disabled = false;
+                stopButton.disabled = true;
+                speakingStatus.classList.remove('active');
+            }
+        });
+
+        // Handle stop button
+        document.getElementById('stopButton').addEventListener('click', async () => {
+            try {
+                await fetch('/api/stop', { method: 'POST' });
+                if (speakingCheckInterval) {
+                    clearInterval(speakingCheckInterval);
+                }
+                document.getElementById('speakingStatus').classList.remove('active');
+                document.getElementById('speakButton').disabled = false;
+                document.getElementById('stopButton').disabled = true;
+            } catch (error) {
+                console.error('Error stopping speech:', error);
+            }
+        });
+
+        // Initialize
+        loadVoices();
+    </script>
+</body>
+</html> 

@@ -6,8 +6,12 @@ from tts_wrapper import (
     ElevenLabsTTS,
     GoogleClient,
     GoogleTTS,
+    GoogleTransClient,
+    GoogleTransTTS,
     MicrosoftClient,
     MicrosoftTTS,
+    PlayHTClient,
+    PlayHTTTS,
     PollyClient,
     PollyTTS,
     SherpaOnnxClient,
@@ -40,12 +44,29 @@ class TTSProvider:
         raise NotImplementedError
 
     def get_speak_data(self, text: str, voice_id: str) -> bytes:
-        """Get speech data for text."""
-        raise NotImplementedError
+        """Get speech data for text using synth_to_bytes."""
+        if not hasattr(self.tts, "synth_to_bytes"):
+            raise NotImplementedError("Provider does not support audio streaming")
+        return self.tts.synth_to_bytes(text, voice_id=voice_id)
 
     def speak(self, text: str, voice_id: str) -> None:
         """Speak text using the specified voice."""
-        raise NotImplementedError
+        if not hasattr(self.tts, "speak"):
+            raise NotImplementedError("Provider does not support direct speech")
+        self.tts.speak(text, voice_id=voice_id)
+
+
+class MicrosoftTTSProvider(TTSProvider):
+    """Microsoft TTS provider wrapper."""
+
+    def __init__(self, client: MicrosoftClient):
+        """Initialize the Microsoft TTS provider."""
+        super().__init__()
+        self.tts = MicrosoftTTS(client)
+
+    def get_voices(self) -> list[dict[str, Any]]:
+        """Get available voices."""
+        return self.tts.get_voices()
 
 
 class SpeechManager:
@@ -58,9 +79,13 @@ class SpeechManager:
         self.current_provider = None
         self.is_speaking = False
 
-    def init_providers(self):
+    def init_providers(self, config=None):
         """Initialize TTS providers based on configuration."""
-        config = get_tts_config()
+        if config is None:
+            from .config import get_tts_config as get_config
+
+            config = get_config()
+
         engines = config.get("engines", ["espeak"])
         self.logger.info(f"SpeechManager: Got engines from config: {engines}")
 
@@ -71,84 +96,38 @@ class SpeechManager:
                     f"SpeechManager: Attempting to initialize {engine_name} provider..."
                 )
 
+                engine_config = config.get("engine_configs", {}).get(engine_name, {})
+
                 if engine_name == "espeak":
                     client = eSpeakClient()
                     self.providers["espeak"] = eSpeakTTS(client)
-                    self.logger.info(
-                        "SpeechManager: eSpeak provider initialized successfully"
-                    )
-                elif engine_name == "sherpaonnx" and "sherpaonnx" in config.get(
-                    "engine_configs", {}
-                ):
-                    client = SherpaOnnxClient()
+                elif engine_name == "sherpaonnx":
+                    client = SherpaOnnxClient(**engine_config)
                     self.providers["sherpaonnx"] = SherpaOnnxTTS(client)
-                    self.logger.info(
-                        "SpeechManager: SherpaOnnx provider initialized successfully"
-                    )
-                elif engine_name == "google" and "google" in config.get(
-                    "engine_configs", {}
-                ):
-                    client = GoogleClient(credentials=config.get("credentials", {}))
+                elif engine_name == "google":
+                    client = GoogleClient(**engine_config)
                     self.providers["google"] = GoogleTTS(client)
-                    self.logger.info(
-                        "SpeechManager: Google provider initialized successfully"
-                    )
-                elif engine_name == "microsoft" and "microsoft" in config.get(
-                    "engine_configs", {}
-                ):
-                    client = MicrosoftClient(credentials=config.get("credentials", {}))
+                elif engine_name == "googletrans":
+                    client = GoogleTransClient(engine_config.get("voice_id", "en-us"))
+                    self.providers["googletrans"] = GoogleTransTTS(client)
+                elif engine_name == "microsoft":
+                    client = MicrosoftClient(**engine_config)
                     self.providers["microsoft"] = MicrosoftTTS(client)
-                    self.logger.info(
-                        "SpeechManager: Microsoft provider initialized successfully"
-                    )
-                elif engine_name == "polly" and "polly" in config.get(
-                    "engine_configs", {}
-                ):
-                    client = PollyClient(credentials=config.get("credentials", {}))
+                elif engine_name == "polly":
+                    client = PollyClient(**engine_config)
                     self.providers["polly"] = PollyTTS(client)
-                    self.logger.info(
-                        "SpeechManager: Polly provider initialized successfully"
-                    )
-                elif engine_name == "watson" and "watson" in config.get(
-                    "engine_configs", {}
-                ):
-                    client = WatsonClient(credentials=config.get("credentials", {}))
+                elif engine_name == "watson":
+                    client = WatsonClient(**engine_config)
                     self.providers["watson"] = WatsonTTS(client)
-                    self.logger.info(
-                        "SpeechManager: Watson provider initialized successfully"
-                    )
-                elif engine_name == "elevenlabs" and "elevenlabs" in config.get(
-                    "engine_configs", {}
-                ):
-                    client = ElevenLabsClient(credentials=config.get("credentials", {}))
+                elif engine_name == "elevenlabs":
+                    client = ElevenLabsClient(**engine_config)
                     self.providers["elevenlabs"] = ElevenLabsTTS(client)
-                    self.logger.info(
-                        "SpeechManager: ElevenLabs provider initialized successfully"
-                    )
-                elif engine_name == "witai" and "witai" in config.get(
-                    "engine_configs", {}
-                ):
-                    client = WitAiClient(credentials=config.get("credentials", {}))
+                elif engine_name == "witai":
+                    client = WitAiClient(**engine_config)
                     self.providers["witai"] = WitAiTTS(client)
-                    self.logger.info(
-                        "SpeechManager: Wit.AI provider initialized successfully"
-                    )
-                # elif engine_name == "avsynth" and "avsynth" in config.get(
-                #     "engine_configs", {}
-                # ):
-                #     client = AVSynthClient()
-                #     self.providers["avsynth"] = AVSynthTTS(client)
-                #     self.logger.info(
-                #         "SpeechManager: AVSynth provider initialized successfully"
-                #     )
-                # elif engine_name == "sapi" and "sapi" in config.get(
-                #     "engine_configs", {}
-                # ):
-                #     client = SAPIClient()
-                #     self.providers["sapi"] = SAPITTS(client)
-                #     self.logger.info(
-                #         "SpeechManager: SAPI provider initialized successfully"
-                #     )
+                elif engine_name == "playht":
+                    client = PlayHTClient(**engine_config)
+                    self.providers["playht"] = PlayHTTTS(client)
                 else:
                     self.logger.warning(
                         f"SpeechManager: Unsupported TTS engine: {engine_name}"
@@ -202,7 +181,24 @@ class SpeechManager:
         )
         if not provider:
             raise ValueError(f"Provider {provider_id} not found")
-        return provider.get_speak_data(text, voice_id)
+        import tempfile
+        import os
+
+        # Create a temporary file
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+            # Generate the audio file
+            provider.synth_to_file(
+                text, temp_file.name, output_format="wav", voice_id=voice_id
+            )
+
+            # Read the file contents
+            with open(temp_file.name, "rb") as f:
+                data = f.read()
+
+            # Clean up the temp file
+            os.unlink(temp_file.name)
+
+            return data
 
     def speak(self, text: str, voice_id: str, provider_id: str | None = None) -> None:
         """Speak text using the specified provider."""
@@ -213,7 +209,7 @@ class SpeechManager:
             raise ValueError(f"Provider {provider_id} not found")
         self.is_speaking = True
         try:
-            provider.speak(text, voice_id)
+            provider.speak(text=text, voice_id=voice_id)
         finally:
             self.is_speaking = False
 

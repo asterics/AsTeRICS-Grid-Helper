@@ -5,11 +5,7 @@ import logging
 import os
 import sys
 from urllib.parse import unquote
-import tempfile
-import json
-
-# Flask imports
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request, send_file, render_template, redirect, url_for
 from flask_cors import CORS
 from flask_restx import Api, Resource, fields
 
@@ -24,7 +20,7 @@ else:
 sys.path.append(os.path.dirname(bundle_dir))
 
 try:
-    from speech.config import CACHE_ENABLED
+    from speech.config_manager import ConfigManager
     from speech.speech_manager import (
         SpeechManager,
         get_speak_data,
@@ -35,7 +31,7 @@ try:
     )
 except ImportError:
     # Fallback for when running as module
-    from config import CACHE_ENABLED
+    from config_manager import ConfigManager
     from speech_manager import (
         SpeechManager,
         get_speak_data,
@@ -56,6 +52,9 @@ app = Flask(__name__)
 app.url_map.strict_slashes = False
 CORS(app)
 
+# Create configuration manager instance
+config_manager = ConfigManager()
+
 # Create speech manager instance
 speech_manager = SpeechManager()
 
@@ -66,7 +65,7 @@ api = Api(
     title="AsTeRICS Grid Speech API",
     description="API for text-to-speech functionality in AsTeRICS Grid",
     doc="/docs",
-    prefix="/api",  # Add a prefix to avoid conflicts with Flask routes
+    prefix="/api",
 )
 
 # Define namespaces
@@ -83,6 +82,97 @@ root_response = api.model(
         "endpoints": fields.Raw(description="Available API endpoints"),
     },
 )
+
+
+@app.route("/")
+def index():
+    """Main configuration page for the speech service."""
+    return config()
+
+
+@app.route("/config", methods=["GET", "POST"])
+def config():
+    """Configuration page for the speech service."""
+    validation_errors = {}
+    success_message = None
+    error_message = None
+
+    if request.method == "POST":
+        try:
+            # Update general settings
+            config_manager.config["General"]["cache_enabled"] = str(
+                bool(request.form.get("cache_enabled"))
+            )
+            config_manager.config["General"]["cache_dir"] = request.form.get(
+                "cache_dir", "temp"
+            )
+
+            # Get enabled engines
+            enabled_engines = request.form.getlist("enabled_engines")
+            config_manager.set_enabled_engines(enabled_engines)
+
+            # Update engine configurations
+            for engine in config_manager.get_available_engines():
+                if engine.name in enabled_engines:
+                    engine_config = {}
+
+                    # Special handling for Google Cloud credentials
+                    if engine.name == "google":
+                        # Check for file upload first
+                        if "google_credentials_file" in request.files:
+                            file = request.files["google_credentials_file"]
+                            if file and file.filename.endswith(".json"):
+                                try:
+                                    credentials_json = file.read().decode("utf-8")
+                                    engine_config["credentials_json"] = credentials_json
+                                except Exception as e:
+                                    validation_errors["google"] = [
+                                        f"Error reading JSON file: {str(e)}"
+                                    ]
+                        # If no file uploaded, check for pasted JSON
+                        if not engine_config and request.form.get(
+                            "google_credentials_json"
+                        ):
+                            engine_config["credentials_json"] = request.form.get(
+                                "google_credentials_json"
+                            )
+                    else:
+                        # Standard field handling for other engines
+                        for field in engine.required_fields:
+                            field_name = f"{engine.name}_{field}"
+                            engine_config[field] = request.form.get(field_name, "")
+
+                    config_manager.set_engine_config(engine.name, engine_config)
+
+            # Validate configurations
+            all_valid = True
+            for engine in enabled_engines:
+                errors = config_manager.validate_engine_config(engine)
+                if errors:
+                    validation_errors[engine] = errors
+                    all_valid = False
+
+            if all_valid:
+                config_manager.save_config()
+                # Reinitialize speech manager with new configuration
+                speech_manager.init_providers(config_manager.get_tts_config())
+                success_message = "Configuration saved successfully"
+            else:
+                error_message = "Please fix the configuration errors"
+
+        except Exception as e:
+            logger.error(f"Error saving configuration: {e}", exc_info=True)
+            error_message = f"Error saving configuration: {str(e)}"
+
+    return render_template(
+        "config.html",
+        config=config_manager.config,
+        available_engines=config_manager.get_available_engines(),
+        enabled_engines=config_manager.get_enabled_engines(),
+        validation_errors=validation_errors,
+        success_message=success_message,
+        error_message=error_message,
+    )
 
 
 @ns.route("/")
@@ -188,9 +278,38 @@ class Voices(Resource):
             return {"error": str(e), "status": "error", "voices": []}, 200
 
 
+def create_wav_header(pcm_data: bytes) -> bytes:
+    """Create a WAV header for the PCM data."""
+    # WAV header parameters
+    sample_rate = 16000  # Standard sample rate for speech
+    bits_per_sample = 16  # 16-bit audio
+    channels = 1  # Mono audio
+    data_size = len(pcm_data)
+
+    # WAV header (44 bytes)
+    header = bytearray()
+    header.extend(b"RIFF")  # ChunkID
+    header.extend((36 + data_size).to_bytes(4, "little"))  # ChunkSize
+    header.extend(b"WAVE")  # Format
+    header.extend(b"fmt ")  # Subchunk1ID
+    header.extend((16).to_bytes(4, "little"))  # Subchunk1Size
+    header.extend((1).to_bytes(2, "little"))  # AudioFormat (1 = PCM)
+    header.extend(channels.to_bytes(2, "little"))  # NumChannels
+    header.extend(sample_rate.to_bytes(4, "little"))  # SampleRate
+    header.extend(
+        (sample_rate * channels * bits_per_sample // 8).to_bytes(4, "little")
+    )  # ByteRate
+    header.extend((channels * bits_per_sample // 8).to_bytes(2, "little"))  # BlockAlign
+    header.extend(bits_per_sample.to_bytes(2, "little"))  # BitsPerSample
+    header.extend(b"data")  # Subchunk2ID
+    header.extend(data_size.to_bytes(4, "little"))  # Subchunk2Size
+
+    return bytes(header)
+
+
 @ns.route("/speakdata/<string:text>")
 @ns.route("/speakdata/<string:text>/<string:provider_id>")
-@ns.route("/speakdata/<string:text>/<string:provider_id>/<string:voice_id>")
+@ns.route("/speakdata/<string:text>/<string:provider_id>/<path:voice_id>")
 class SpeakData(Resource):
     @ns.doc("get_speak_data")
     @ns.param("text", "Text to convert to speech")
@@ -210,10 +329,13 @@ class SpeakData(Resource):
                     "error": "Failed to generate speech data",
                     "status": "error",
                 }, 200
+
+            # Add WAV header to the PCM data
+            wav_data = create_wav_header(data) + data
             return send_file(
-                io.BytesIO(data),
+                io.BytesIO(wav_data),
                 mimetype="audio/wav",
-                as_attachment=True,
+                as_attachment=False,
                 download_name="speech.wav",
             )
         except Exception as e:
@@ -227,7 +349,7 @@ class SpeakData(Resource):
 
 @ns.route("/speak/<string:text>")
 @ns.route("/speak/<string:text>/<string:provider_id>")
-@ns.route("/speak/<string:text>/<string:provider_id>/<string:voice_id>")
+@ns.route("/speak/<string:text>/<string:provider_id>/<path:voice_id>")
 class Speak(Resource):
     @ns.doc("speak_text")
     @ns.param("text", "Text to speak")
@@ -241,7 +363,7 @@ class Speak(Resource):
             text = unquote(text).lower()
             provider_id = unquote(provider_id)
             voice_id = unquote(voice_id)
-            speak(text, provider_id, voice_id, speech_manager)
+            speak(text, voice_id, provider_id, speech_manager)
             return {"status": "success"}
         except Exception as e:
             logger.error(f"Error in /speak endpoint: {e!s}", exc_info=True)
@@ -255,7 +377,7 @@ class Speak(Resource):
 @app.route("/cache/<text>/<provider_id>/<voice_id>", methods=["POST", "GET"])
 def cache_data(text: str, provider_id: str = "", voice_id: str = ""):
     """Cache speech data for the given text."""
-    if not CACHE_ENABLED:
+    if not config_manager.config["General"]["cache_enabled"]:
         return jsonify(False)
     text = unquote(text).lower()
     provider_id = unquote(provider_id)
@@ -298,11 +420,17 @@ class Stop(Resource):
         return self.get()
 
 
+@app.route("/test")
+def test():
+    """Test page for trying out TTS endpoints."""
+    return render_template("test.html")
+
+
 def start_server():
     """Start the Flask server."""
     try:
-        # Initialize speech providers
-        speech_manager.init_providers()
+        # Initialize speech providers with configuration
+        speech_manager.init_providers(config_manager.get_tts_config())
 
         # Start Flask server
         app.run(

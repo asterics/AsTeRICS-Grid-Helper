@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AsTeRICS Grid Speech Configuration</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Add Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .engine-card {
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+            scroll-margin-top: 20px;  /* Add padding when scrolling to anchor */
+        }
+        .engine-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .engine-card .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #f8f9fa;
+        }
+        .offline-badge {
+            background-color: #28a745;
+        }
+        .online-badge {
+            background-color: #007bff;
+        }
+        .error-message {
+            color: #dc3545;
+            margin-top: 0.5rem;
+        }
+        .nav-pills {
+            margin-bottom: 2rem;
+        }
+        .nav-pills .nav-link {
+            color: #495057;
+        }
+        .nav-pills .nav-link.active {
+            background-color: #007bff;
+            color: white;
+        }
+        .credentials-input {
+            margin-bottom: 1rem;
+        }
+        .credentials-input .form-text {
+            margin-bottom: 0.5rem;
+        }
+        .credentials-input .nav-tabs {
+            margin-bottom: 1rem;
+        }
+        .engine-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 0.5rem;
+        }
+        .engine-nav-item {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.875rem;
+            color: #495057;
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: 2rem;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+        .engine-nav-item:hover {
+            background-color: #e9ecef;
+            color: #212529;
+            text-decoration: none;
+        }
+        .engine-nav-item .badge {
+            margin-left: 0.5rem;
+            font-size: 0.75rem;
+        }
+        .engine-status {
+            margin-right: 0.5rem;
+            font-size: 0.875rem;
+        }
+        .engine-status-enabled {
+            color: #198754;  /* Bootstrap success color */
+        }
+        .engine-status-disabled {
+            color: #dc3545;  /* Bootstrap danger color */
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">AsTeRICS Grid Speech</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/">Configuration</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/test">Test TTS</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/docs">API Documentation</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% if success_message %}
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            {{ success_message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endif %}
+        
+        {% if error_message %}
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            {{ error_message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('config') }}" enctype="multipart/form-data">
+            <ul class="nav nav-pills" id="configTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#general" type="button">General Settings</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#engines" type="button">TTS Engines</button>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="general">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">General Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-check mb-3">
+                                <input type="checkbox" class="form-check-input" id="cache_enabled" name="cache_enabled" {% if config.getboolean('General', 'cache_enabled', fallback=True) %}checked{% endif %}>
+                                <label class="form-check-label" for="cache_enabled">Enable Speech Caching</label>
+                                <div class="form-text">Cache generated speech to improve performance for repeated phrases.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="cache_dir" class="form-label">Cache Directory</label>
+                                <input type="text" class="form-control" id="cache_dir" name="cache_dir" value="{{ config.get('General', 'cache_dir', fallback='temp') }}">
+                                <div class="form-text">Directory where cached speech files will be stored.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="engines">
+                    <div class="alert alert-info mb-4">
+                        <h6 class="alert-heading">About TTS Engines</h6>
+                        <p class="mb-0">This application supports multiple Text-to-Speech engines, both online and offline. Enable the engines you want to use and configure their required settings below.</p>
+                    </div>
+
+                    <!-- Quick Navigation -->
+                    <div class="engine-nav">
+                        {% for engine in available_engines %}
+                        <a href="#engine-{{ engine.name }}" class="engine-nav-item">
+                            <span class="engine-status {% if engine.name in enabled_engines %}engine-status-enabled{% else %}engine-status-disabled{% endif %}">
+                                <i class="bi {% if engine.name in enabled_engines %}bi-check-circle-fill{% else %}bi-x-circle-fill{% endif %}"></i>
+                            </span>
+                            {{ engine.display_name }}
+                            <span class="badge {% if engine.is_offline %}offline-badge{% else %}online-badge{% endif %}">
+                                {% if engine.is_offline %}Offline{% else %}Online{% endif %}
+                            </span>
+                        </a>
+                        {% endfor %}
+                    </div>
+
+                    {% for engine in available_engines %}
+                    <div class="card engine-card" id="engine-{{ engine.name }}">
+                        <div class="card-header">
+                            <div>
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="engine_{{ engine.name }}" name="enabled_engines" value="{{ engine.name }}"
+                                        {% if engine.name in enabled_engines %}checked{% endif %}>
+                                    <label class="form-check-label" for="engine_{{ engine.name }}">
+                                        {{ engine.display_name }}
+                                        <span class="badge {% if engine.is_offline %}offline-badge{% else %}online-badge{% endif %} ms-2">
+                                            {% if engine.is_offline %}Offline{% else %}Online{% endif %}
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text">{{ engine.description }}</p>
+                            {% if engine.name in validation_errors %}
+                            <div class="error-message mb-3">
+                                {% for error in validation_errors[engine.name] %}
+                                <p class="mb-1">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            {% if engine.name == "google" %}
+                            <!-- Special handling for Google Cloud credentials -->
+                            <div class="credentials-input">
+                                <ul class="nav nav-tabs" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#google-file" type="button">Upload JSON File</button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#google-paste" type="button">Paste JSON</button>
+                                    </li>
+                                </ul>
+                                <div class="tab-content">
+                                    <div class="tab-pane fade show active" id="google-file">
+                                        <div class="mb-3">
+                                            <label for="google_credentials_file" class="form-label">Service Account JSON File</label>
+                                            <input type="file" class="form-control" id="google_credentials_file" name="google_credentials_file" accept=".json">
+                                            <div class="form-text">Upload your Google Cloud service account JSON credentials file.</div>
+                                        </div>
+                                    </div>
+                                    <div class="tab-pane fade" id="google-paste">
+                                        <div class="mb-3">
+                                            <label for="google_credentials_json" class="form-label">Service Account JSON</label>
+                                            <textarea class="form-control" id="google_credentials_json" name="google_credentials_json" rows="4" placeholder="Paste your Google Cloud service account JSON credentials here">{{ config.get('google', 'credentials_json', fallback='') }}</textarea>
+                                            <div class="form-text">Paste your Google Cloud service account JSON credentials.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% else %}
+                            <!-- Standard fields for other engines -->
+                            {% if engine.required_fields or engine.help_text %}
+                                <div class="alert alert-light border mb-3">
+                                    <small class="text-muted d-block mb-2">Configuration:</small>
+                                    <ul class="list-unstyled mb-0">
+                                        {% for field in engine.help_text %}
+                                        <li><small>• {{ field }}: {{ engine.help_text[field] }}</small></li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% for field in engine.help_text %}
+                                <div class="mb-3">
+                                    <label for="{{ engine.name }}_{{ field }}" class="form-label">{{ field|title }}</label>
+                                    <input type="text" class="form-control" id="{{ engine.name }}_{{ field }}" 
+                                           name="{{ engine.name }}_{{ field }}" 
+                                           value="{{ config.get(engine.name, field, fallback='') }}"
+                                           {% if field not in engine.required_fields %}placeholder="Optional"{% endif %}
+                                           placeholder="{{ engine.help_text[field] }}">
+                                    <div class="form-text">{{ engine.help_text[field] }}</div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="alert alert-light border mb-3">
+                                    <small class="text-muted">No configuration needed</small>
+                                </div>
+                            {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="mt-4 mb-4">
+                <button type="submit" class="btn btn-primary">Save Configuration</button>
+            </div>
+        </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Smooth scroll to engine cards when clicking navigation links
+        document.querySelectorAll('.engine-nav-item').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = link.getAttribute('href').substring(1);
+                const targetElement = document.getElementById(targetId);
+                targetElement.scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+    </script>
+</body>
+</html> 

@@ -66,10 +66,10 @@ requires-dist = [
     { name = "hydra-core", marker = "extra == 'test'" },
     { name = "omegaconf", specifier = ">=2.3.0" },
     { name = "omegaconf", marker = "extra == 'test'" },
-    { name = "py3-tts-wrapper", extras = ["avsynth"], marker = "sys_platform == 'darwin'" },
-    { name = "py3-tts-wrapper", extras = ["espeak"], marker = "sys_platform == 'linux'" },
-    { name = "py3-tts-wrapper", extras = ["sapi"], marker = "sys_platform == 'win32'" },
-    { name = "py3-tts-wrapper", extras = ["sherpaonnx", "espeak", "elevenlabs", "playht", "microsoft", "polly", "watson", "googletrans", "witai", "controlaudio"] },
+    { name = "py3-tts-wrapper", extras = ["avsynth"], marker = "sys_platform == 'darwin'", specifier = "==0.9.28" },
+    { name = "py3-tts-wrapper", extras = ["espeak"], marker = "sys_platform == 'linux'", specifier = "==0.9.28" },
+    { name = "py3-tts-wrapper", extras = ["sapi"], marker = "sys_platform == 'win32'", specifier = "==0.9.28" },
+    { name = "py3-tts-wrapper", extras = ["sherpaonnx", "espeak", "elevenlabs", "playht", "microsoft", "polly", "watson", "googletrans", "playht", "witai", "controlaudio"], specifier = "==0.9.28" },
     { name = "pyinstaller", marker = "extra == 'test'" },
     { name = "pytest", marker = "extra == 'test'" },
     { name = "pytest-cov", marker = "extra == 'test'" },
@@ -97,6 +97,7 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/ee/02/c73a10f5d8ecf83e54f02e6e24813ce7661ad50f532944da5c0ecaeaea54/azure_cognitiveservices_speech-1.43.0-py3-none-manylinux2014_aarch64.whl", hash = "sha256:07bdedba8494edfb24306279d3b0500ece016fc811ec0b3366707a75d118a245", size = 40710733 },
     { url = "https://files.pythonhosted.org/packages/83/c5/b593f08f70b73b8a997b87673235f83ec42d9c9bf0fae7f348e889dfc00c/azure_cognitiveservices_speech-1.43.0-py3-none-win32.whl", hash = "sha256:36570806a6b8fe12696a0372193ecc623bc629e355fa1edc67c03ac71731066b", size = 2152884 },
     { url = "https://files.pythonhosted.org/packages/f5/b8/b1e7894cb4bcd721356eb1687e6f17112c2c659f4365827b8e7daac07c7d/azure_cognitiveservices_speech-1.43.0-py3-none-win_amd64.whl", hash = "sha256:50a50aabc69434d1311c09eaa640622c1d47d270e6cbcf5d192a04325cb7de4c", size = 2410492 },
+    { url = "https://files.pythonhosted.org/packages/5e/79/8d16e2cdeb01459726818558f1b484106b89e8b54ad85a847e471a5c2659/azure_cognitiveservices_speech-1.43.0-py3-none-win_arm64.whl", hash = "sha256:29dab439a3789196c38b169a74fb4eefa4ede59e79f062541c08cc39a2d786a5", size = 2205218 },
 ]
 
 [[package]]
@@ -657,7 +658,7 @@ wheels = [
 
 [[package]]
 name = "py3-tts-wrapper"
-version = "0.9.27"
+version = "0.9.28"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
@@ -666,9 +667,9 @@ dependencies = [
     { name = "sounddevice" },
     { name = "soundfile" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6d/1f/7461a9d26434ee3a05786ee261f17c0cc96b434f1599e614e7219af3522a/py3_tts_wrapper-0.9.27.tar.gz", hash = "sha256:aa4fddc8e4311ac7627cfbeda380cc7aab94ff474919c2aeeb2d90d8c66ec8d1", size = 6922903 }
+sdist = { url = "https://files.pythonhosted.org/packages/3e/81/51c7e35ce093d2668de59b876976c6669284ee406d78a9bd77870d501368/py3_tts_wrapper-0.9.28.tar.gz", hash = "sha256:d0e4b70b9f8be4d49636545a88d352dac68c930436fc0a7387895aac14e02540", size = 6925926 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/19/b2/6f397fdcc59794dc9e1d5518f2427ee167e6c1fa1f263943c7c948402736/py3_tts_wrapper-0.9.27-py3-none-any.whl", hash = "sha256:6004bdc809c18a046495ff25a54ebcce57d98f26a877172b7fbaa5b73638fdda", size = 847476 },
+    { url = "https://files.pythonhosted.org/packages/68/ad/cdbd924b62e4d2f197a4361b9d9a3a11234c72c0e37d03ab45f2a0f70d38/py3_tts_wrapper-0.9.28-py3-none-any.whl", hash = "sha256:c6f6a13d5160a1f310d18289d648371c0032b17bb9a011e88cdd016cc55f2716", size = 849872 },
 ]
 
 [package.optional-dependencies]

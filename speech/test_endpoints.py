@@ -104,7 +104,7 @@ def mock_speech_manager(mocker):
 
 def test_root_endpoint(test_client):
     """Test the root endpoint."""
-    response = test_client.get("/api/")
+    response = test_client.get("/")
     assert response.status_code == 200
     data = response.get_json()
     assert data["name"] == "AsTeRICS Grid Speech API"
@@ -119,7 +119,7 @@ def test_voices_endpoint(test_client, mock_speech_manager, mocker):
         "speech.start.get_voices", return_value=mock_speech_manager.get_voices()
     )
 
-    response = test_client.get("/api/voices")
+    response = test_client.get("/voices")
     assert response.status_code == 200
     data = response.get_json()
     assert data["status"] == "success"
@@ -132,7 +132,7 @@ def test_speak_endpoint(test_client, mock_speech_manager, mocker):
     # Mock the speak function to use our mock manager
     mocker.patch("speech.start.speak")
 
-    response = test_client.get("/api/speak/test_text/sherpaonnx/en")
+    response = test_client.get("/speak/test_text/sherpaonnx/en")
     assert response.status_code == 200
     data = response.get_json()
     assert data["status"] == "success"
@@ -143,7 +143,7 @@ def test_speakdata_endpoint(test_client, mock_speech_manager, mocker):
     # Mock the get_speak_data function to return test audio data
     mocker.patch("speech.start.get_speak_data", return_value=b"test_audio_data")
 
-    response = test_client.get("/api/speakdata/test_text/sherpaonnx/en")
+    response = test_client.get("/speakdata/test_text/sherpaonnx/en")
     assert response.status_code == 200
     assert response.mimetype == "audio/wav"
 
@@ -153,7 +153,7 @@ def test_speaking_endpoint(test_client, mock_speech_manager, mocker):
     # Mock the is_speaking function to use our mock manager
     mocker.patch("speech.start.is_speaking", return_value=False)
 
-    response = test_client.get("/api/speaking")
+    response = test_client.get("/speaking")
     assert response.status_code == 200
     data = response.get_json()
     assert data["status"] == "success"
@@ -165,7 +165,7 @@ def test_stop_endpoint(test_client, mock_speech_manager, mocker):
     # Mock the stop_speaking function to use our mock manager
     mocker.patch("speech.start.stop_speaking")
 
-    response = test_client.get("/api/stop")
+    response = test_client.get("/stop")
     assert response.status_code == 200
     data = response.get_json()
     assert data["status"] == "success"
@@ -186,7 +186,7 @@ def test_error_handling(test_client, mock_speech_manager, mocker):
     # Mock the get_voices function to raise an exception
     mocker.patch("speech.start.get_voices", side_effect=Exception("Test error"))
 
-    response = test_client.get("/api/voices")
+    response = test_client.get("/voices")
     assert response.status_code == 200
     data = response.get_json()
     assert data["status"] == "error"
@@ -204,7 +204,7 @@ class TestSpeechService(unittest.TestCase):
 
     def test_voices_endpoint(self):
         """Test the /voices endpoint."""
-        response = self.app.get("/api/voices")
+        response = self.app.get("/voices")
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertIn("voices", data)
@@ -223,7 +223,7 @@ class TestSpeechService(unittest.TestCase):
         """Test the /voices endpoint with error handling."""
         with patch("speech.start.get_voices") as mock_get_voices:
             mock_get_voices.side_effect = Exception("Test error")
-            response = self.app.get("/api/voices")
+            response = self.app.get("/voices")
             self.assertEqual(response.status_code, 200)
             data = response.get_json()
             self.assertEqual(data["error"], "Test error")
@@ -235,7 +235,7 @@ class TestSpeechService(unittest.TestCase):
         text = "This is a test sentence to verify speech synthesis."
         provider_id = "sherpaonnx"  # Use sherpaonnx provider
         voice_id = "en"  # Use English voice
-        response = self.app.get(f"/api/speakdata/{text}/{provider_id}/{voice_id}")
+        response = self.app.get(f"/speakdata/{text}/{provider_id}/{voice_id}")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.mimetype, "audio/wav")
         # Verify we got some audio data
@@ -247,7 +247,7 @@ class TestSpeechService(unittest.TestCase):
         """Test the /speakdata endpoint with error handling."""
         with patch("speech.start.get_speak_data") as mock_get_speak_data:
             mock_get_speak_data.return_value = None
-            response = self.app.get("/api/speakdata/test/tts/en-US")
+            response = self.app.get("/speakdata/test/tts/en-US")
             self.assertEqual(response.status_code, 200)
             data = response.get_json()
             self.assertEqual(data["error"], "Failed to generate speech data")
@@ -258,7 +258,7 @@ class TestSpeechService(unittest.TestCase):
         text = "This is a test sentence to verify speech synthesis."
         provider_id = "sherpaonnx"  # Use sherpaonnx provider
         voice_id = "en"  # Use English voice
-        response = self.app.get(f"/api/speak/{text}/{provider_id}/{voice_id}")
+        response = self.app.get(f"/speak/{text}/{provider_id}/{voice_id}")
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertEqual(data["status"], "success")
@@ -269,7 +269,7 @@ class TestSpeechService(unittest.TestCase):
         """Test the /speak endpoint with error handling."""
         with patch("speech.start.speak") as mock_speak:
             mock_speak.side_effect = Exception("Test error")
-            response = self.app.get("/api/speak/test/tts/en-US")
+            response = self.app.get("/speak/test/tts/en-US")
             self.assertEqual(response.status_code, 200)
             data = response.get_json()
             self.assertEqual(data["error"], "Test error")
@@ -277,7 +277,7 @@ class TestSpeechService(unittest.TestCase):
 
     def test_speaking_endpoint(self):
         """Test the /speaking endpoint."""
-        response = self.app.get("/api/speaking")
+        response = self.app.get("/speaking")
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertIn("speaking", data)
@@ -286,7 +286,7 @@ class TestSpeechService(unittest.TestCase):
 
     def test_stop_endpoint(self):
         """Test the /stop endpoint."""
-        response = self.app.get("/api/stop")
+        response = self.app.get("/stop")
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertEqual(data["status"], "success")
@@ -295,7 +295,7 @@ class TestSpeechService(unittest.TestCase):
         """Test the /stop endpoint with error handling."""
         with patch("speech.start.stop_speaking") as mock_stop:
             mock_stop.side_effect = Exception("Test error")
-            response = self.app.get("/api/stop")
+            response = self.app.get("/stop")
             self.assertEqual(response.status_code, 200)
             data = response.get_json()
             self.assertEqual(data["error"], "Test error")
@@ -307,10 +307,10 @@ class TestSpeechService(unittest.TestCase):
         provider_id = "tts"  # Default provider
         voice_id = "en-US"  # Default voice
         # First request should generate and cache
-        response1 = self.app.get(f"/api/speakdata/{text}/{provider_id}/{voice_id}")
+        response1 = self.app.get(f"/speakdata/{text}/{provider_id}/{voice_id}")
         self.assertEqual(response1.status_code, 200)
         # Second request should use cache
-        response2 = self.app.get(f"/api/speakdata/{text}/{provider_id}/{voice_id}")
+        response2 = self.app.get(f"/speakdata/{text}/{provider_id}/{voice_id}")
         self.assertEqual(response2.status_code, 200)
         # Verify both responses are identical
         self.assertEqual(response1.data, response2.data)
