@@ -5,9 +5,9 @@ from tts_wrapper import (
     ElevenLabsClient,
     ElevenLabsTTS,
     GoogleClient,
-    GoogleTTS,
     GoogleTransClient,
     GoogleTransTTS,
+    GoogleTTS,
     MicrosoftClient,
     MicrosoftTTS,
     PlayHTClient,
@@ -22,13 +22,7 @@ from tts_wrapper import (
     WitAiTTS,
     eSpeakClient,
     eSpeakTTS,
-    # AVSynthClient,
-    # AVSynthTTS,
-    # SAPIClient,
-    # SAPITTS,
 )
-
-from .config import get_tts_config
 
 
 class TTSProvider:
@@ -140,10 +134,12 @@ class SpeechManager:
             # Set the first provider as the current provider
             self.current_provider = next(iter(self.providers.values()))
             self.logger.info(
-                f"SpeechManager: Successfully initialized providers: {list(self.providers.keys())}"
+                "SpeechManager: Successfully initialized providers: "
+                f"{list(self.providers.keys())}"
             )
             self.logger.info(
-                f"SpeechManager: Current provider: {self.current_provider.__class__.__name__}"
+                "SpeechManager: Current provider: "
+                f"{self.current_provider.__class__.__name__}"
             )
 
         except Exception as e:
@@ -181,8 +177,8 @@ class SpeechManager:
         )
         if not provider:
             raise ValueError(f"Provider {provider_id} not found")
-        import tempfile
         import os
+        import tempfile
 
         # Create a temporary file
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:

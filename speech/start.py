@@ -5,7 +5,8 @@ import logging
 import os
 import sys
 from urllib.parse import unquote
-from flask import Flask, jsonify, request, send_file, render_template, redirect, url_for
+
+from flask import Flask, jsonify, render_template, request, send_file
 from flask_cors import CORS
 from flask_restx import Api, Resource, fields
 
@@ -127,7 +128,7 @@ def config():
                                     engine_config["credentials_json"] = credentials_json
                                 except Exception as e:
                                     validation_errors["google"] = [
-                                        f"Error reading JSON file: {str(e)}"
+                                        f"Error reading JSON file: {e!s}"
                                     ]
                         # If no file uploaded, check for pasted JSON
                         if not engine_config and request.form.get(
@@ -162,7 +163,7 @@ def config():
 
         except Exception as e:
             logger.error(f"Error saving configuration: {e}", exc_info=True)
-            error_message = f"Error saving configuration: {str(e)}"
+            error_message = f"Error saving configuration: {e!s}"
 
     return render_template(
         "config.html",
@@ -278,35 +279,6 @@ class Voices(Resource):
             return {"error": str(e), "status": "error", "voices": []}, 200
 
 
-def create_wav_header(pcm_data: bytes) -> bytes:
-    """Create a WAV header for the PCM data."""
-    # WAV header parameters
-    sample_rate = 16000  # Standard sample rate for speech
-    bits_per_sample = 16  # 16-bit audio
-    channels = 1  # Mono audio
-    data_size = len(pcm_data)
-
-    # WAV header (44 bytes)
-    header = bytearray()
-    header.extend(b"RIFF")  # ChunkID
-    header.extend((36 + data_size).to_bytes(4, "little"))  # ChunkSize
-    header.extend(b"WAVE")  # Format
-    header.extend(b"fmt ")  # Subchunk1ID
-    header.extend((16).to_bytes(4, "little"))  # Subchunk1Size
-    header.extend((1).to_bytes(2, "little"))  # AudioFormat (1 = PCM)
-    header.extend(channels.to_bytes(2, "little"))  # NumChannels
-    header.extend(sample_rate.to_bytes(4, "little"))  # SampleRate
-    header.extend(
-        (sample_rate * channels * bits_per_sample // 8).to_bytes(4, "little")
-    )  # ByteRate
-    header.extend((channels * bits_per_sample // 8).to_bytes(2, "little"))  # BlockAlign
-    header.extend(bits_per_sample.to_bytes(2, "little"))  # BitsPerSample
-    header.extend(b"data")  # Subchunk2ID
-    header.extend(data_size.to_bytes(4, "little"))  # Subchunk2Size
-
-    return bytes(header)
-
-
 @ns.route("/speakdata/<string:text>")
 @ns.route("/speakdata/<string:text>/<string:provider_id>")
 @ns.route("/speakdata/<string:text>/<string:provider_id>/<path:voice_id>")
@@ -330,10 +302,9 @@ class SpeakData(Resource):
                     "status": "error",
                 }, 200
 
-            # Add WAV header to the PCM data
-            wav_data = create_wav_header(data) + data
+            # The data is already a complete WAV file from synth_to_file
             return send_file(
-                io.BytesIO(wav_data),
+                io.BytesIO(data),
                 mimetype="audio/wav",
                 as_attachment=False,
                 download_name="speech.wav",

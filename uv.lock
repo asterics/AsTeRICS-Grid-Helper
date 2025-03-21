@@ -66,10 +66,10 @@ requires-dist = [
     { name = "hydra-core", marker = "extra == 'test'" },
     { name = "omegaconf", specifier = ">=2.3.0" },
     { name = "omegaconf", marker = "extra == 'test'" },
-    { name = "py3-tts-wrapper", extras = ["avsynth"], marker = "sys_platform == 'darwin'", specifier = "==0.9.28" },
-    { name = "py3-tts-wrapper", extras = ["espeak"], marker = "sys_platform == 'linux'", specifier = "==0.9.28" },
-    { name = "py3-tts-wrapper", extras = ["sapi"], marker = "sys_platform == 'win32'", specifier = "==0.9.28" },
-    { name = "py3-tts-wrapper", extras = ["sherpaonnx", "espeak", "elevenlabs", "playht", "microsoft", "polly", "watson", "googletrans", "playht", "witai", "controlaudio"], specifier = "==0.9.28" },
+    { name = "py3-tts-wrapper", extras = ["avsynth"], marker = "sys_platform == 'darwin'", specifier = "==0.9.31" },
+    { name = "py3-tts-wrapper", extras = ["espeak"], marker = "sys_platform == 'linux'", specifier = "==0.9.31" },
+    { name = "py3-tts-wrapper", extras = ["sapi"], marker = "sys_platform == 'win32'", specifier = "==0.9.31" },
+    { name = "py3-tts-wrapper", extras = ["sherpaonnx", "espeak", "elevenlabs", "playht", "microsoft", "polly", "watson", "googletrans", "playht", "witai", "controlaudio"], specifier = "==0.9.31" },
     { name = "pyinstaller", marker = "extra == 'test'" },
     { name = "pytest", marker = "extra == 'test'" },
     { name = "pytest-cov", marker = "extra == 'test'" },
@@ -658,7 +658,7 @@ wheels = [
 
 [[package]]
 name = "py3-tts-wrapper"
-version = "0.9.28"
+version = "0.9.31"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
@@ -667,9 +667,9 @@ dependencies = [
     { name = "sounddevice" },
     { name = "soundfile" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3e/81/51c7e35ce093d2668de59b876976c6669284ee406d78a9bd77870d501368/py3_tts_wrapper-0.9.28.tar.gz", hash = "sha256:d0e4b70b9f8be4d49636545a88d352dac68c930436fc0a7387895aac14e02540", size = 6925926 }
+sdist = { url = "https://files.pythonhosted.org/packages/4b/5e/b8c0fae8b1ad8f78f1c19a5b8dd2402f0a06e59445d8c12096529181a7f0/py3_tts_wrapper-0.9.31.tar.gz", hash = "sha256:460f49e67cdd550b0c76a16564c7a9085dea78d5f5c16a7903ab764f3e20548b", size = 6926961 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/68/ad/cdbd924b62e4d2f197a4361b9d9a3a11234c72c0e37d03ab45f2a0f70d38/py3_tts_wrapper-0.9.28-py3-none-any.whl", hash = "sha256:c6f6a13d5160a1f310d18289d648371c0032b17bb9a011e88cdd016cc55f2716", size = 849872 },
+    { url = "https://files.pythonhosted.org/packages/b7/80/0aad4175c4c3c4ec4358b5663e939113ce1eb4bbd77949b52c9cd5868d97/py3_tts_wrapper-0.9.31-py3-none-any.whl", hash = "sha256:2d5983f665eb2c67ae317df06003f1719590a35f59f9100ad42b6de151d5bd88", size = 849938 },
 ]
 
 [package.optional-dependencies]

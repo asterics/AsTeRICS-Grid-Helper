@@ -22,7 +22,7 @@ def build_executable():
             """AsTeRICS Grid Speech Service
 ===========================
 
-This is a standalone speech service for AsTeRICS Grid using Sherpa-ONNX for 
+This is a standalone speech service for AsTeRICS Grid using Sherpa-ONNX for
 offline text-to-speech.
 
 Usage:
@@ -41,7 +41,7 @@ Available Voices:
 - en-us-ryan-low: English (US) - Ryan (Low)
 - en-us-ryan-high: English (US) - Ryan (High)
 
-Note: The first run may take a few seconds as it downloads and initializes 
+Note: The first run may take a few seconds as it downloads and initializes
 the Sherpa-ONNX model.
 
 Configuration:

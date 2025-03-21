@@ -5,7 +5,6 @@ import json
 import logging
 import os
 from dataclasses import dataclass
-from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +20,8 @@ class EngineInfo:
     display_name: str
     description: str
     is_offline: bool
-    required_fields: List[str]
-    help_text: Dict[str, str]
+    required_fields: list[str]
+    help_text: dict[str, str]
 
 
 # Define available engines and their properties
@@ -173,17 +172,17 @@ class ConfigManager:
         with open(self.config_path, "w") as f:
             self.config.write(f)
 
-    def get_enabled_engines(self) -> List[str]:
+    def get_enabled_engines(self) -> list[str]:
         """Get the list of enabled engines."""
         engines_str = self.config.get("General", "engines", fallback="sherpaonnx")
         return [e.strip() for e in engines_str.split(",") if e.strip()]
 
-    def set_enabled_engines(self, engines: List[str]) -> None:
+    def set_enabled_engines(self, engines: list[str]) -> None:
         """Set the list of enabled engines."""
         self.config["General"]["engines"] = ",".join(engines)
         self.save_config()
 
-    def get_engine_config(self, engine: str) -> Dict[str, str]:
+    def get_engine_config(self, engine: str) -> dict[str, str]:
         """Get the configuration for a specific engine."""
         if not self.config.has_section(engine):
             return {}
@@ -195,7 +194,7 @@ class ConfigManager:
 
         return config
 
-    def set_engine_config(self, engine: str, config: Dict[str, str]) -> None:
+    def set_engine_config(self, engine: str, config: dict[str, str]) -> None:
         """Set the configuration for a specific engine."""
         if not self.config.has_section(engine):
             self.config.add_section(engine)
@@ -210,7 +209,7 @@ class ConfigManager:
             self.config[engine][key] = value
         self.save_config()
 
-    def validate_engine_config(self, engine: str) -> List[str]:
+    def validate_engine_config(self, engine: str) -> list[str]:
         """Validate the configuration for a specific engine.
 
         Returns:
@@ -229,7 +228,7 @@ class ConfigManager:
 
         return errors
 
-    def get_tts_config(self) -> Dict:
+    def get_tts_config(self) -> dict:
         """Get the complete TTS configuration."""
         enabled_engines = self.get_enabled_engines()
 
@@ -263,7 +262,7 @@ class ConfigManager:
                     except json.JSONDecodeError:
                         # If not JSON, treat as file path
                         if os.path.exists(creds_json):
-                            with open(creds_json, "r") as f:
+                            with open(creds_json) as f:
                                 credentials = json.load(f)
                         else:
                             credentials = {}
@@ -312,11 +311,11 @@ class ConfigManager:
 
         return config
 
-    def get_available_engines(self) -> List[EngineInfo]:
+    def get_available_engines(self) -> list[EngineInfo]:
         """Get information about all available engines."""
         return list(AVAILABLE_ENGINES.values())
 
-    def get_engine_info(self, engine: str) -> Optional[EngineInfo]:
+    def get_engine_info(self, engine: str) -> EngineInfo | None:
         """Get information about a specific engine."""
         return AVAILABLE_ENGINES.get(engine)
 
