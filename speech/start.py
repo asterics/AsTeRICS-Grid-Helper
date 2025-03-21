@@ -14,9 +14,17 @@ from flask_restx import Api, Resource, fields
 if getattr(sys, "frozen", False):
     # we are running in a bundle
     bundle_dir = sys._MEIPASS
+    # Set template folder for frozen app
+    app = Flask(
+        __name__, template_folder=os.path.join(bundle_dir, "speech", "templates")
+    )
 else:
     # we are running in a normal Python environment
     bundle_dir = os.path.dirname(os.path.abspath(__file__))
+    app = Flask(__name__)
+
+app.url_map.strict_slashes = False
+CORS(app)
 
 sys.path.append(os.path.dirname(bundle_dir))
 
@@ -48,10 +56,6 @@ logger = logging.getLogger(__name__)
 
 # HTTP status codes
 HTTP_NOT_FOUND = 404
-
-app = Flask(__name__)
-app.url_map.strict_slashes = False
-CORS(app)
 
 # Create configuration manager instance
 config_manager = ConfigManager()
@@ -85,10 +89,19 @@ root_response = api.model(
 )
 
 
+# Root route for web interface
 @app.route("/")
 def index():
     """Main configuration page for the speech service."""
-    return config()
+    return render_template(
+        "config.html",
+        config=config_manager.config,
+        available_engines=config_manager.get_available_engines(),
+        enabled_engines=config_manager.get_enabled_engines(),
+        validation_errors={},
+        success_message=None,
+        error_message=None,
+    )
 
 
 @app.route("/config", methods=["GET", "POST"])
