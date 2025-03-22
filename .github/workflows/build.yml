@@ -46,10 +46,12 @@ jobs:
     - name: Install dependencies
       run: |
         uv sync
-        if ($env:RUNNER_OS -eq "Windows") {
-          uv pip install numpy==1.24.3
-        }
         uv pip install pyinstaller
+
+    - name: Install Windows-specific dependencies
+      if: runner.os == 'Windows'
+      run: |
+        uv pip install numpy==1.24.3
         
     - name: Build executable
       run: |
