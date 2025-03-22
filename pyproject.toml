@@ -19,7 +19,7 @@ dependencies = [
     "sounddevice>=0.4.6",
     "soundfile>=0.12.1"
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 readme = "README.md"
 license = { file = "LICENSE" }
 
