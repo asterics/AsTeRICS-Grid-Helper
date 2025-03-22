@@ -1,12 +1,23 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
 import site
+import glob
 from PyInstaller.utils.hooks import collect_dynamic_libs
 
 block_cipher = None
 
 # Get site-packages directory
 site_packages = site.getsitepackages()[0]
+
+# Find the actual tts_wrapper package directory
+tts_wrapper_path = None
+for path in glob.glob(os.path.join(site_packages, 'py3_tts_wrapper*')):
+    if os.path.isdir(path):
+        tts_wrapper_path = path
+        break
+
+if not tts_wrapper_path:
+    raise Exception("Could not find tts_wrapper package in site-packages")
 
 # Collect Azure Speech SDK dynamic libraries
 azure_binaries = collect_dynamic_libs('azure.cognitiveservices.speech')
@@ -22,7 +33,7 @@ a = Analysis(
         ('speech/speech_manager.py', 'speech'),
         ('speech/__init__.py', 'speech'),
         ('speech/templates', 'speech/templates'),  # Add templates directory
-        (os.path.join(site_packages, 'py3_tts_wrapper'), 'tts_wrapper'),  # Include tts_wrapper from site-packages
+        (tts_wrapper_path, 'tts_wrapper'),  # Include tts_wrapper from site-packages
     ],
     hiddenimports=[
         'flask',
