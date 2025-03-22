@@ -8,15 +8,28 @@ block_cipher = None
 
 # Get site-packages directory
 site_packages = site.getsitepackages()[0]
+print(f"Site packages directory: {site_packages}")
+
+# List all directories in site-packages
+print("\nAll directories in site-packages:")
+for item in os.listdir(site_packages):
+    if os.path.isdir(os.path.join(site_packages, item)):
+        print(f"  - {item}")
 
 # Find the actual tts_wrapper package directory
 tts_wrapper_path = None
+print("\nSearching for tts_wrapper package...")
 for path in glob.glob(os.path.join(site_packages, 'py3_tts_wrapper*')):
+    print(f"Checking path: {path}")
     if os.path.isdir(path):
         tts_wrapper_path = path
+        print(f"Found tts_wrapper at: {path}")
         break
 
 if not tts_wrapper_path:
+    print("\nCould not find tts_wrapper package. Available paths:")
+    for path in glob.glob(os.path.join(site_packages, '*tts*')):
+        print(f"  - {path}")
     raise Exception("Could not find tts_wrapper package in site-packages")
 
 # Collect Azure Speech SDK dynamic libraries
