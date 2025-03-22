@@ -10,6 +10,11 @@ block_cipher = None
 site_packages = site.getsitepackages()[0]
 print(f"Site packages directory: {site_packages}")
 
+# On Windows, the actual packages are in Lib/site-packages
+if os.name == 'nt':
+    site_packages = os.path.join(site_packages, 'Lib', 'site-packages')
+    print(f"Windows site-packages directory: {site_packages}")
+
 # List all directories in site-packages
 print("\nAll directories in site-packages:")
 for item in os.listdir(site_packages):
