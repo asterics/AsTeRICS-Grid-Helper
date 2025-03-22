@@ -54,6 +54,21 @@
             color: #6c757d;
             margin-top: 0.5rem;
         }
+        .voice-details {
+            color: #666;
+            margin-top: 8px;
+        }
+        .voice-card {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .voice-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .voice-card.border-primary {
+            background-color: #f8f9ff;
+        }
     </style>
 </head>
 <body>
@@ -87,7 +102,16 @@
                     <div class="card-header">
                         <h5 class="mb-0">Available Voices</h5>
                         <div class="mt-2">
-                            <input type="text" class="form-control" id="voiceSearch" placeholder="Search voices by name, language, or engine...">
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="voiceSearch" placeholder="Search voices...">
+                                <select class="form-select" id="searchField" style="max-width: 140px;">
+                                    <option value="all">All Fields</option>
+                                    <option value="name">Name</option>
+                                    <option value="language">Language</option>
+                                    <option value="providerId">Provider</option>
+                                    <option value="gender">Gender</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div class="card-body voice-list" id="voiceList">
@@ -165,80 +189,12 @@
         let speakingCheckInterval = null;
         let allVoices = []; // Store all voices for filtering
 
-        // Filter voices based on search input
-        function filterVoices(searchTerm) {
-            const voiceList = document.getElementById('voiceList');
-            const normalizedSearch = searchTerm.toLowerCase().trim();
-            
-            if (!normalizedSearch) {
-                // Show all voices if search is empty
-                displayVoices(allVoices);
-                return;
-            }
-
-            const filteredVoices = allVoices.filter(voice => {
-                return voice.name.toLowerCase().includes(normalizedSearch) ||
-                       (voice.language_codes && voice.language_codes.some(lang => lang.toLowerCase().includes(normalizedSearch))) ||
-                       voice.providerId.toLowerCase().includes(normalizedSearch) ||
-                       voice.gender.toLowerCase().includes(normalizedSearch);
-            });
-
-            displayVoices(filteredVoices);
-        }
-
-        // Display voices in the list
-        function displayVoices(voices) {
-            const voiceList = document.getElementById('voiceList');
-            
-            if (voices.length === 0) {
-                voiceList.innerHTML = `
-                    <div class="alert alert-warning">
-                        No voices match your search. Try different keywords.
-                    </div>
-                `;
-                return;
-            }
-
-            voiceList.innerHTML = '';
-            voices.forEach(voice => {
-                const card = document.createElement('div');
-                card.className = 'card voice-card';
-                card.innerHTML = `
-                    <div class="card-body">
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="voice" 
-                                   id="voice_${voice.id}" value="${voice.id}">
-                            <label class="form-check-label" for="voice_${voice.id}">
-                                <strong>${voice.name}</strong><br>
-                                <small class="text-muted">
-                                    ${voice.language_codes ? voice.language_codes[0] : 'Unknown'} (${voice.gender})<br>
-                                    <span class="badge bg-secondary">${voice.providerId}</span>
-                                </small>
-                            </label>
-                        </div>
-                    </div>
-                `;
-                voiceList.appendChild(card);
-
-                // Add click handler
-                card.querySelector('input[type="radio"]').addEventListener('change', (e) => {
-                    selectedVoiceId = e.target.value;
-                    document.getElementById('selectedVoice').textContent = `${voice.name} (${voice.providerId})`;
-                });
-            });
-        }
-
         // Load available voices
         async function loadVoices() {
             try {
                 const response = await fetch('/api/voices');
-                const data = await response.json();
+                const voices = await response.json();
                 
-                if (data.status === 'error') {
-                    throw new Error(data.error || 'Failed to load voices');
-                }
-                
-                const voices = data.voices;
                 if (!voices || !Array.isArray(voices)) {
                     throw new Error('Invalid voice data received');
                 }
@@ -267,14 +223,53 @@
             }
         }
 
-        // Add search input handler with debounce
-        let searchTimeout;
-        document.getElementById('voiceSearch').addEventListener('input', (e) => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                filterVoices(e.target.value);
-            }, 300); // Wait 300ms after user stops typing
-        });
+        // Display voices in the list
+        function displayVoices(voices) {
+            const voiceList = document.getElementById('voiceList');
+            voiceList.innerHTML = voices.map(voice => `
+                <div class="voice-card card ${selectedVoiceId === voice.id ? 'border-primary' : ''}" 
+                     data-voice-id="${voice.id}" 
+                     onclick="selectVoice('${voice.id}')">
+                    <div class="card-body">
+                        <h6 class="card-title mb-2">${voice.name}</h6>
+                        <div class="voice-details small">
+                            <div><strong>Provider:</strong> ${voice.providerId}</div>
+                            <div><strong>Language:</strong> ${voice.language || 'N/A'}</div>
+                            <div><strong>Gender:</strong> ${voice.gender || 'N/A'}</div>
+                            ${voice.language_codes && voice.language_codes.length > 0 ? 
+                                `<div><strong>Language Codes:</strong> ${voice.language_codes.join(', ')}</div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Filter voices based on search input
+        function filterVoices() {
+            const searchText = document.getElementById('voiceSearch').value.toLowerCase();
+            const searchField = document.getElementById('searchField').value;
+            
+            const filteredVoices = allVoices.filter(voice => {
+                if (searchField === 'all') {
+                    return (
+                        voice.name.toLowerCase().includes(searchText) ||
+                        (voice.language && voice.language.toLowerCase().includes(searchText)) ||
+                        voice.providerId.toLowerCase().includes(searchText) ||
+                        (voice.gender && voice.gender.toLowerCase().includes(searchText)) ||
+                        (voice.language_codes && voice.language_codes.some(code => code.toLowerCase().includes(searchText)))
+                    );
+                }
+                
+                if (searchField === 'language' && voice.language_codes) {
+                    return voice.language_codes.some(code => code.toLowerCase().includes(searchText)) ||
+                           (voice.language && voice.language.toLowerCase().includes(searchText));
+                }
+                
+                return voice[searchField] && voice[searchField].toLowerCase().includes(searchText);
+            });
+            
+            displayVoices(filteredVoices);
+        }
 
         // Update endpoint info when selection changes
         document.querySelectorAll('input[name="endpoint"]').forEach(radio => {
@@ -381,6 +376,26 @@
 
         // Initialize
         loadVoices();
+
+        // Update the search functionality
+        document.getElementById('voiceSearch').addEventListener('input', filterVoices);
+        document.getElementById('searchField').addEventListener('change', filterVoices);
+
+        // Handle voice selection
+        function selectVoice(voiceId) {
+            selectedVoiceId = voiceId;
+            const selectedVoice = allVoices.find(v => v.id === voiceId);
+            document.getElementById('selectedVoice').textContent = selectedVoice.name;
+            
+            // Update visual selection state
+            document.querySelectorAll('.voice-card').forEach(card => {
+                if (card.dataset.voiceId === voiceId) {
+                    card.classList.add('border-primary');
+                } else {
+                    card.classList.remove('border-primary');
+                }
+            });
+        }
     </script>
 </body>
 </html> 

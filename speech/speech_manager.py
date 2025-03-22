@@ -41,7 +41,21 @@ class TTSProvider(CustomTTSProvider):
 
     def get_voices(self) -> list[dict[str, Any]]:
         """Get available voices."""
-        return self.tts.get_voices()
+        voices = self.tts.get_voices()
+        cleaned_voices = []
+        for voice in voices:
+            language_codes = voice.get("language_codes", [""])
+            language = language_codes[0] if language_codes else ""
+            cleaned_voices.append(
+                {
+                    "id": voice.get("id", ""),
+                    "name": voice.get("name", ""),
+                    "language": language,
+                    "language_codes": voice.get("language_codes", []),
+                    "gender": voice.get("gender", "Unknown"),
+                }
+            )
+        return cleaned_voices
 
     def speak(self, text: str, voice_id: str) -> None:
         """Speak text using specified voice."""
@@ -54,8 +68,8 @@ class TTSProvider(CustomTTSProvider):
     def get_speak_data(self, text: str, voice_id: str) -> bytes:
         """Get WAV audio data for text."""
         try:
-            import tempfile
             import os
+            import tempfile
 
             # Create a temporary WAV file
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
@@ -114,11 +128,13 @@ class SpeechManager:
         for engine in engines:
             provider = None
             try:
+                self.logger.debug(f"Initializing provider for engine: {engine}")
                 if engine == "sherpaonnx":
                     # Initialize Sherpa-ONNX provider
                     engine_config = config.get("engine_configs", {}).get(
                         "sherpaonnx", {}
                     )
+                    self.logger.debug(f"Sherpa config: {engine_config}")
                     client = SherpaOnnxClient(
                         model_path=engine_config.get("model_path"),
                         tokens_path=engine_config.get("tokens_path"),
@@ -131,6 +147,7 @@ class SpeechManager:
                     engine_config = config.get("engine_configs", {}).get(
                         "microsoft", {}
                     )
+                    self.logger.debug(f"Microsoft config: {engine_config}")
                     credentials = engine_config.get("credentials", ("", ""))
                     client = MicrosoftClient(credentials=credentials)
                     provider = TTSProvider()
@@ -152,6 +169,7 @@ class SpeechManager:
                     engine_config = config.get("engine_configs", {}).get(
                         "googletrans", {}
                     )
+                    self.logger.debug(f"Google Translate config: {engine_config}")
                     client = GoogleTransClient()
                     provider = TTSProvider()
                     provider.tts = GoogleTransTTS(client)
@@ -209,27 +227,26 @@ class SpeechManager:
                     # Initialize OpenAI provider
                     engine_config = config.get("engine_configs", {}).get("openai", {})
                     provider = OpenAITTSProvider(engine_config)  # type: ignore
-                    if provider:
-                        self.providers[engine] = provider
-                        if not self.current_provider:
-                            self.current_provider = provider
-                            self.logger.info(
-                                f"Current provider: {provider.__class__.__name__}"
-                            )
 
+                # Store provider if successfully initialized
                 if provider:
+                    self.logger.debug(f"Successfully initialized provider for {engine}")
                     self.providers[engine] = provider
                     if not self.current_provider:
                         self.current_provider = provider
                         self.logger.info(
                             f"Current provider: {provider.__class__.__name__}"
                         )
+                else:
+                    self.logger.warning(f"Failed to initialize provider for {engine}")
 
             except Exception as e:
                 self.logger.error(f"Failed to initialize {engine} provider: {e}")
 
         if not self.providers:
             self.logger.warning("No TTS providers were successfully initialized")
+        else:
+            self.logger.debug(f"Initialized providers: {list(self.providers.keys())}")
 
     def get_voices(self) -> list[dict[str, Any]]:
         """Get available voices from all providers."""
@@ -238,20 +255,33 @@ class SpeechManager:
             try:
                 self.logger.info(f"Getting voices from provider: {provider_id}")
                 provider_voices = provider.get_voices()
-                self.logger.info(
-                    f"Found {len(provider_voices)} voices from {provider_id}"
+                self.logger.debug(
+                    f"Voices from provider {provider_id}: {provider_voices}"
                 )
 
-                # Add provider ID to each voice
+                # Add provider ID and type to each voice
                 for voice in provider_voices:
+                    # Format name as "Name (Language) - provider"
+                    base_name = voice["name"]
+                    language = voice.get("language", "")
+                    formatted_name = (
+                        f"{base_name} ({language}) - {provider_id}"
+                        if language
+                        else f"{base_name} - {provider_id}"
+                    )
+                    self.logger.debug(
+                        f"Formatting voice name: base={base_name}, lang={language}, result={formatted_name}"
+                    )
+
+                    voice["name"] = formatted_name
                     voice["providerId"] = provider_id
+                    voice["type"] = "external_playing"
+                    self.logger.debug(f"Final voice entry: {voice}")
                 all_voices.extend(provider_voices)
             except Exception as e:
                 self.logger.error(f"Error getting voices from {provider_id}: {e}")
+                continue
 
-        self.logger.info(
-            f"Found {len(all_voices)} voices across {len(self.providers)} providers"
-        )
         return all_voices
 
     def speak(self, text: str, voice_id: str, provider_id: str | None = None) -> None:

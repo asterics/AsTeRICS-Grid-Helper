@@ -21,7 +21,7 @@ if getattr(sys, "frozen", False):
 else:
     # we are running in a normal Python environment
     bundle_dir = os.path.dirname(os.path.abspath(__file__))
-    app = Flask(__name__)
+app = Flask(__name__)
 
 app.url_map.strict_slashes = False
 CORS(app)
@@ -286,7 +286,26 @@ class Voices(Resource):
         """Get available voices from all providers."""
         try:
             voices = get_voices(speech_manager)
-            return {"voices": voices, "status": "success"}
+            # Transform to match original structure while preserving all fields
+            transformed_voices = []
+            for voice in voices:
+                transformed_voice = {
+                    "id": voice["id"],
+                    "name": voice[
+                        "name"
+                    ],  # Name is already formatted correctly by SpeechManager
+                    "language": voice.get("language", ""),  # Preserve language field
+                    "language_codes": voice.get(
+                        "language_codes", []
+                    ),  # Preserve language codes
+                    "gender": voice.get("gender", "Unknown"),  # Preserve gender
+                    "providerId": voice[
+                        "providerId"
+                    ],  # Provider ID is set by SpeechManager
+                    "type": voice.get("type", "external_playing"),
+                }
+                transformed_voices.append(transformed_voice)
+            return transformed_voices
         except Exception as e:
             logger.error(f"Error in /voices endpoint: {e!s}", exc_info=True)
             return {"error": str(e), "status": "error", "voices": []}, 200
