@@ -9,6 +9,8 @@ A text-to-speech service that provides a simple HTTP API for speech synthesis. T
   - Sherpa-ONNX (default, offline)
   - Amazon Polly
   - Google Cloud TTS
+  - OpenAI TTS
+  - Google Translate TTS
   - Microsoft Azure TTS
   - IBM Watson
   - ElevenLabs
@@ -26,6 +28,10 @@ A text-to-speech service that provides a simple HTTP API for speech synthesis. T
 git clone https://github.com/yourusername/AsTeRICS-Grid-Helper.git
 cd AsTeRICS-Grid-Helper
 ```
+
+2. Install UV
+
+Follow the instructions at https://docs.astral.sh/uv/getting-started/installation/#installation-methods
 
 
 ## Usage
@@ -47,156 +53,211 @@ To build platform-specific executables:
 uv run python build.py
 ```
 
-This will create executables in the `dist` directory:
-- macOS: `asterics-grid-speech-mac`
-- Windows: `asterics-grid-speech.exe`
-- Linux: `asterics-grid-speech`
+This will create executables in the `dist` directory.
 
 ### API Endpoints
 
 #### List Available Voices
 ```bash
-curl http://localhost:5555/voices
+curl http://localhost:5555/apivoices
 ```
 
 #### Generate Speech Data
 ```bash
-curl "http://localhost:5555/speakdata/Hello%20World/en-us-amy-medium" --output output.wav
+curl "http://localhost:5555/apispeakdata/Hello%20World/en-us-amy-medium" --output output.wav
 ```
 
 #### Speak Text
 ```bash
-curl "http://localhost:5555/speak/Hello%20World/en-us-amy-medium"
+curl "http://localhost:5555/api/speak/Hello%20World/en-us-amy-medium"
 ```
 
 ### Configuration
 
-The service can be configured by modifying `speech/config.py`. Here's an example configuration:
+The service can be configured by modifying `speech.ini`. Here's an example configuration:
 
-```python
-# TTS Configuration
-TTS_CONFIG = {
-    "tts_provider": "sherpa-onnx",  # Default provider
-    "cache_enabled": True,
-    "cache_dir": "cache",
-    "cache_ttl": 3600,  # Cache TTL in seconds
+```ini
+[General]
+engines = sherpaonnx,microsoft,google,googletrans,elevenlabs,polly,witai,playht,espeak,openai
+cache_enabled = True
+cache_dir = temp
+
+[microsoft]
+subscription_key = your-subscription-key
+subscription_region = your-region
+
+[elevenlabs]
+api_key = your-api-key
+
+[polly]
+aws_key_id = your-aws-key-id
+aws_secret_access_key = your-aws-secret-key
+aws_region = your-aws-region
+
+[witai]
+token = your-witai-token
+
+[sherpaonnx]
+# No additional configuration needed for sherpaonnx
+
+[googletrans]
+voice_id = 
+
+[google]
+credentials_json = {
+    "type": "service_account",
+    "project_id": "your-project-id",
+    "private_key_id": "your-private-key-id",
+    "private_key": "your-private-key",
+    "client_email": "your-client-email",
+    "client_id": "your-client-id",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": "your-cert-url"
 }
 
-# Provider-specific credentials
-CREDENTIALS = {
-    "polly": {
-        "aws_access_key_id": "your-access-key",
-        "aws_secret_access_key": "your-secret-key",
-        "region_name": "us-east-1"
-    },
-    "google": {
-        "credentials_file": "path/to/credentials.json"
-    },
-    "azure": {
-        "subscription_key": "your-key",
-        "region": "your-region"
-    },
-    "watson": {
-        "apikey": "your-api-key",
-        "url": "your-service-url"
-    },
-    "elevenlabs": {
-        "api_key": "your-api-key"
-    },
-    "wit": {
-        "api_key": "your-api-key"
-    }
-}
+[espeak]
+# No additional configuration needed for espeak
 
-# Voice configuration
-VOICE_CONFIG = {
-    "default_voice": "en-us-amy-medium",
-    "fallback_voice": "en-us-ryan-medium"
-}
+[playht]
+api_key = your-playht-api-key
+user_id = your-playht-user-id
+
+[openai]
+api_key = your-openai-api-key
+model = gpt-4o-mini-tts
+output_format = wav
 ```
 
-### Available Voices
+You can also configure the service through the web interface at `http://localhost:5555` which provides a user-friendly way to:
+1. Enable/disable TTS providers
+2. Configure provider credentials
+3. Manage cache settings
+4. Test different voices
 
-The service provides several pre-configured voices using the Piper model:
-
-- `en-us-amy-medium`: English (US) - Amy (Medium)
-- `en-us-amy-low`: English (US) - Amy (Low)
-- `en-us-amy-high`: English (US) - Amy (High)
-- `en-us-ryan-medium`: English (US) - Ryan (Medium)
-- `en-us-ryan-low`: English (US) - Ryan (Low)
-- `en-us-ryan-high`: English (US) - Ryan (High)
 
 ### Using Different TTS Providers
 
 To use a different TTS provider:
 
-1. Update the `tts_provider` in `TTS_CONFIG`
-2. Add the required credentials in the `CREDENTIALS` section
+1. Add the provider to the `engines` list in the `[General]` section
+2. Add the required credentials in the provider's section
 3. Restart the service
 
 Example for using Amazon Polly:
-```python
-TTS_CONFIG = {
-    "tts_provider": "polly",
-    "cache_enabled": True,
-    "cache_dir": "cache",
-    "cache_ttl": 3600,
-}
+```ini
+[General]
+engines = polly
+cache_enabled = True
+cache_dir = temp
 
-CREDENTIALS = {
-    "polly": {
-        "aws_access_key_id": "your-access-key",
-        "aws_secret_access_key": "your-secret-key",
-        "region_name": "us-east-1"
-    }
-}
+[polly]
+aws_key_id = your-aws-key-id
+aws_secret_access_key = your-aws-secret-key
+aws_region = us-east-1
 ```
 
-## Creating Custom TTS Providers
+You can allow multiple providers to be used at the same time.
+eg.
+```ini
+[General]
+engines = polly,sherpaonnx
+```
+
+## Development
+
+### Creating Custom TTS Providers
 
 The system supports custom TTS providers through a simple interface. This allows you to integrate any TTS engine that can be controlled via command line or API.
 
 ### Provider Interface
 
-To create a custom provider, create a new class that inherits from `CustomTTSProvider` in `speech/custom_providers.py`:
+To create a custom provider, create a new class that inherits from `CustomTTSProvider` in `speech/custom_providers.py`. Here's a complete example:
 
 ```python
-from speech.speech_manager import CustomTTSProvider
+from typing import Any
+from speech.base_provider import CustomTTSProvider
 
 class MyCustomProvider(CustomTTSProvider):
     def __init__(self, config: dict[str, Any] | None = None):
+        """Initialize the provider.
+        
+        Args:
+            config: Configuration dictionary with provider-specific settings
+        """
         super().__init__()
         self.config = config or {}
         # Initialize your TTS engine here
+        # Example: self.engine = MyTTSEngine(self.config)
 
     def get_voices(self) -> list[dict[str, Any]]:
-        """Return list of available voices."""
-        # Return list of dicts with keys: id, name, language_codes, gender
-        return []
+        """Return list of available voices.
+        
+        Returns:
+            List of dictionaries with the following keys:
+            - id: Unique identifier for the voice
+            - name: Display name of the voice
+            - language_codes: List of supported language codes
+            - gender: Voice gender (M/F/N)
+        """
+        # Example:
+        return [
+            {
+                "id": "voice1",
+                "name": "Voice 1",
+                "language_codes": ["en-US"],
+                "gender": "F"
+            }
+        ]
 
     def speak(self, text: str, voice_id: str) -> None:
-        """Speak text using specified voice."""
+        """Speak text using specified voice.
+        
+        Args:
+            text: Text to speak
+            voice_id: ID of the voice to use
+        """
         # Implement direct speech output
-        pass
+        # Example: self.engine.speak(text, voice_id)
 
     def get_speak_data(self, text: str, voice_id: str) -> bytes:
-        """Get WAV audio data for text."""
-        # Return WAV format audio data
+        """Get WAV audio data for text.
+        
+        Args:
+            text: Text to convert to speech
+            voice_id: ID of the voice to use
+            
+        Returns:
+            WAV format audio data as bytes
+        """
+        # Example:
+        # audio_data = self.engine.synthesize(text, voice_id)
+        # return audio_data
         return b""
 
     def stop_speaking(self) -> None:
         """Stop current speech playback."""
-        # Implement stop functionality
+        # Example: self.engine.stop()
         pass
 ```
 
 ### Registering Your Provider
 
-Add an initialization method to `SpeechManager` in `speech/speech_manager.py`:
+1. Add your provider class to `speech/custom_providers.py`
+
+2. Add an initialization method to `SpeechManager` in `speech/speech_manager.py`:
 
 ```python
 def init_myprovider_provider(self, config: dict[str, Any]) -> CustomTTSProvider | None:
-    """Initialize your custom provider."""
+    """Initialize your custom provider.
+    
+    Args:
+        config: Configuration dictionary with provider-specific settings
+        
+    Returns:
+        Initialized provider instance or None if initialization fails
+    """
     try:
         from .custom_providers import MyCustomProvider
         return MyCustomProvider(config)
@@ -205,91 +266,100 @@ def init_myprovider_provider(self, config: dict[str, Any]) -> CustomTTSProvider 
         return None
 ```
 
-### Configuration
+3. Add your provider to the `init_providers` method in `SpeechManager`:
 
-Add your provider to `speech.ini`:
-
-```ini
-[engines]
-engines = myprovider,espeak
-
-[engine_configs]
-myprovider_path = /path/to/myprovider
-myprovider_data_dir = /path/to/data
-```
-
-### Example Implementations
-
-#### OpenAI TTS Provider
-
-The OpenAI TTS provider demonstrates integration with OpenAI's text-to-speech API:
-
-```ini
-[engines]
-engines = openai
-
-[engine_configs]
-openai_api_key = your-api-key
-openai_model = gpt-4o-mini-tts
-openai_output_format = wav
-```
-
-Features:
-- Uses OpenAI's GPT-4o mini TTS model
-- Supports 11 built-in voices (alloy, ash, ballad, coral, echo, fable, onyx, nova, sage, shimmer)
-- Optimized for English but supports multiple languages
-- High-quality, natural-sounding speech
-- Streaming support for real-time playback
-
-To use the OpenAI provider:
-
-1. Get an API key from [OpenAI](https://platform.openai.com)
-2. Set the `OPENAI_API_KEY` environment variable or add it to your config
-3. Select a voice from the available options
-4. Use the provider as normal
-
-Example usage:
 ```python
-from speech.speech_manager import SpeechManager
-from speech.config import get_tts_config
-
-# Initialize with OpenAI
-config = get_tts_config()
-config["engines"] = ["openai"]
-config["engine_configs"] = {
-    "openai": {
-        "api_key": "your-api-key",
-        "model": "gpt-4o-mini-tts",
-        "output_format": "wav"
-    }
-}
-
-speech_manager = SpeechManager()
-speech_manager.init_providers(config)
-
-# Get available voices
-voices = speech_manager.get_voices()
-for voice in voices:
-    print(f"- {voice['name']} ({voice['language_codes'][0]})")
-
-# Speak text
-speech_manager.speak("Hello, this is a test.", "alloy")
+def init_providers(self, config: dict[str, Any]) -> None:
+    """Initialize TTS providers from config."""
+    # ... existing code ...
+    
+    for engine in engines:
+        try:
+            if engine == "myprovider":
+                provider = self.init_myprovider_provider(config)
+                if provider:
+                    self.providers[engine] = provider
+            # ... other providers ...
 ```
 
-Note: The OpenAI TTS service requires an API key and may incur costs based on usage. See [OpenAI's pricing](https://openai.com/pricing) for details.
 
-#### Template Provider
+### Example Implementation: OpenAI TTS Provider
 
-The `TemplateProvider` class in `speech/custom_providers.py` provides a base template for implementing new TTS providers. It includes:
+The OpenAI TTS provider demonstrates a complete implementation:
 
-1. Basic provider structure
-2. Required method signatures
-3. Type hints and documentation
-4. Error handling patterns
+```python
+from typing import Any
+from speech.base_provider import CustomTTSProvider
+from openai import OpenAI
 
-Use this template as a starting point for implementing new providers.
+class OpenAITTSProvider(CustomTTSProvider):
+    def __init__(self, config: dict[str, Any] | None = None):
+        super().__init__()
+        self.config = config or {}
+        self.api_key = self.config.get("api_key")
+        if not self.api_key:
+            raise ValueError("OpenAI API key is required")
+            
+        self.model = self.config.get("model", "gpt-4o-mini-tts")
+        self.output_format = self.config.get("output_format", "wav")
+        self.client = OpenAI(api_key=self.api_key)
 
-## Development
+    def get_voices(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "id": voice,
+                "name": voice.capitalize(),
+                "language_codes": ["en"],
+                "gender": "Unknown"
+            }
+            for voice in [
+                "alloy", "ash", "ballad", "coral", "echo",
+                "fable", "onyx", "nova", "sage", "shimmer"
+            ]
+        ]
+
+    def speak(self, text: str, voice_id: str) -> None:
+        audio_data = self.get_speak_data(text, voice_id)
+        if not audio_data:
+            raise RuntimeError("Failed to generate audio data")
+            
+        import io
+        import sounddevice as sd
+        import soundfile as sf
+        
+        audio_stream = io.BytesIO(audio_data)
+        data, samplerate = sf.read(audio_stream)
+        sd.play(data, samplerate)
+        sd.wait()
+
+    def get_speak_data(self, text: str, voice_id: str) -> bytes:
+        response = self.client.audio.speech.create(
+            model=self.model,
+            voice=voice_id,
+            input=text,
+            response_format=self.output_format
+        )
+        return response.content
+
+    def stop_speaking(self) -> None:
+        import sounddevice as sd
+        sd.stop()
+```
+
+### Testing Your Provider
+
+1. Install your provider's dependencies:
+```bash
+uv pip install your-provider-dependencies
+```
+
+3. Test your provider:
+```bash
+uv run python -m speech.start
+```
+
+4. Use the web interface at `http://localhost:5555` to test your provider's functionality.
+
 
 ### Running Tests
 

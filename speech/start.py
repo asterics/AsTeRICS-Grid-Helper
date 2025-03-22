@@ -68,23 +68,41 @@ api = Api(
     app,
     version="1.0",
     title="AsTeRICS Grid Speech API",
-    description="API for text-to-speech functionality in AsTeRICS Grid",
+    description="API for text-to-speech functionality in AsTeRICS Grid. All endpoints are prefixed with /api.",
     doc="/docs",
     prefix="/api",
 )
 
 # Define namespaces
-ns = api.namespace("", description="Speech synthesis operations")
+ns = api.namespace(
+    "", description="Speech synthesis operations. All endpoints are prefixed with /api."
+)
 
 # Define models
 root_response = api.model(
     "RootResponse",
     {
-        "name": fields.String(description="API name"),
-        "version": fields.String(description="API version"),
-        "description": fields.String(description="API description"),
-        "documentation": fields.String(description="Link to API documentation"),
-        "endpoints": fields.Raw(description="Available API endpoints"),
+        "name": fields.String(
+            description="API name", example="AsTeRICS Grid Speech API"
+        ),
+        "version": fields.String(description="API version", example="1.0"),
+        "description": fields.String(
+            description="API description",
+            example="API for text-to-speech functionality in AsTeRICS Grid",
+        ),
+        "documentation": fields.String(
+            description="Link to API documentation", example="/docs"
+        ),
+        "endpoints": fields.Raw(
+            description="Available API endpoints (all prefixed with /api)",
+            example={
+                "voices": "/api/voices",
+                "speak": "/api/speak/<text>/<provider_id>/<voice_id>",
+                "speakdata": "/api/speakdata/<text>/<provider_id>/<voice_id>",
+                "speaking": "/api/speaking",
+                "stop": "/api/stop",
+            },
+        ),
     },
 )
 
@@ -201,11 +219,11 @@ class Root(Resource):
             "description": "API for text-to-speech functionality in AsTeRICS Grid",
             "documentation": "/docs",
             "endpoints": {
-                "voices": "/voices",
-                "speak": "/speak/<text>/<provider_id>/<voice_id>",
-                "speakdata": "/speakdata/<text>/<provider_id>/<voice_id>",
-                "speaking": "/speaking",
-                "stop": "/stop",
+                "voices": "/api/voices",
+                "speak": "/api/speak/<text>/<provider_id>/<voice_id>",
+                "speakdata": "/api/speakdata/<text>/<provider_id>/<voice_id>",
+                "speaking": "/api/speaking",
+                "stop": "/api/stop",
             },
         }
 
@@ -214,12 +232,23 @@ class Root(Resource):
 voice_model = api.model(
     "Voice",
     {
-        "id": fields.String(description="Unique identifier for the voice"),
-        "name": fields.String(description="Display name of the voice"),
-        "language_codes": fields.List(
-            fields.String, description="Supported language codes"
+        "id": fields.String(
+            description="Unique identifier for the voice", example="en-us-amy-medium"
         ),
-        "gender": fields.String(description="Voice gender (M/F/N)"),
+        "name": fields.String(
+            description="Display name of the voice", example="Amy (en-US) - sherpaonnx"
+        ),
+        "language": fields.String(description="Primary language code", example="en-US"),
+        "language_codes": fields.List(
+            fields.String, description="Supported language codes", example=["en-US"]
+        ),
+        "gender": fields.String(description="Voice gender (M/F/N)", example="F"),
+        "providerId": fields.String(
+            description="ID of the TTS provider", example="sherpaonnx"
+        ),
+        "type": fields.String(
+            description="Type of voice playback", example="external_playing"
+        ),
     },
 )
 
@@ -229,7 +258,9 @@ voices_response = api.model(
         "voices": fields.List(
             fields.Nested(voice_model), description="List of available voices"
         ),
-        "status": fields.String(description="Response status (success/error)"),
+        "status": fields.String(
+            description="Response status (success/error)", example="success"
+        ),
         "error": fields.String(
             description="Error message if status is error", required=False
         ),
@@ -239,15 +270,19 @@ voices_response = api.model(
 error_response = api.model(
     "ErrorResponse",
     {
-        "error": fields.String(description="Error message"),
-        "status": fields.String(description="Response status (error)"),
+        "error": fields.String(
+            description="Error message", example="Failed to generate speech data"
+        ),
+        "status": fields.String(description="Response status (error)", example="error"),
     },
 )
 
 success_response = api.model(
     "SuccessResponse",
     {
-        "status": fields.String(description="Response status (success)"),
+        "status": fields.String(
+            description="Response status (success)", example="success"
+        ),
     },
 )
 
@@ -255,9 +290,11 @@ speaking_response = api.model(
     "SpeakingResponse",
     {
         "speaking": fields.Boolean(
-            description="Whether text is currently being spoken"
+            description="Whether text is currently being spoken", example=False
         ),
-        "status": fields.String(description="Response status (success)"),
+        "status": fields.String(
+            description="Response status (success)", example="success"
+        ),
     },
 )
 
@@ -279,7 +316,11 @@ def handle_error(error):
 
 @ns.route("/voices")
 class Voices(Resource):
-    @ns.doc("get_voices")
+    @ns.doc(
+        "get_voices",
+        description="Get a list of all available voices from all configured TTS providers",
+        responses={200: "Successfully retrieved voices", 500: "Internal server error"},
+    )
     @ns.response(200, "Success", voices_response)
     @ns.response(500, "Error", error_response)
     def get(self):
@@ -315,8 +356,20 @@ class Voices(Resource):
 @ns.route("/speakdata/<string:text>/<string:provider_id>")
 @ns.route("/speakdata/<string:text>/<string:provider_id>/<path:voice_id>")
 class SpeakData(Resource):
-    @ns.doc("get_speak_data")
-    @ns.param("text", "Text to convert to speech")
+    @ns.doc(
+        "get_speak_data",
+        description="Generate WAV audio data for the given text using specified voice",
+        params={
+            "text": "Text to convert to speech (URL encoded)",
+            "provider_id": "ID of the TTS provider to use (optional)",
+            "voice_id": "ID of the voice to use (optional)",
+        },
+        responses={
+            200: "Successfully generated speech data",
+            500: "Internal server error",
+        },
+    )
+    @ns.param("text", "Text to convert to speech", required=True)
     @ns.param("provider_id", "TTS provider ID", required=False)
     @ns.param("voice_id", "Voice ID to use", required=False)
     @ns.response(200, "Success")
@@ -354,8 +407,17 @@ class SpeakData(Resource):
 @ns.route("/speak/<string:text>/<string:provider_id>")
 @ns.route("/speak/<string:text>/<string:provider_id>/<path:voice_id>")
 class Speak(Resource):
-    @ns.doc("speak_text")
-    @ns.param("text", "Text to speak")
+    @ns.doc(
+        "speak_text",
+        description="Speak the given text using specified voice",
+        params={
+            "text": "Text to speak (URL encoded)",
+            "provider_id": "ID of the TTS provider to use (optional)",
+            "voice_id": "ID of the voice to use (optional)",
+        },
+        responses={200: "Successfully started speaking", 500: "Internal server error"},
+    )
+    @ns.param("text", "Text to speak", required=True)
     @ns.param("provider_id", "TTS provider ID", required=False)
     @ns.param("voice_id", "Voice ID to use", required=False)
     @ns.response(200, "Success", success_response)
@@ -391,7 +453,14 @@ def cache_data(text: str, provider_id: str = "", voice_id: str = ""):
 
 @ns.route("/speaking")
 class Speaking(Resource):
-    @ns.doc("is_speaking")
+    @ns.doc(
+        "is_speaking",
+        description="Check if text is currently being spoken",
+        responses={
+            200: "Successfully retrieved speaking status",
+            500: "Internal server error",
+        },
+    )
     @ns.response(200, "Success", speaking_response)
     @ns.response(500, "Error", error_response)
     def get(self):
@@ -406,7 +475,11 @@ class Speaking(Resource):
 
 @ns.route("/stop")
 class Stop(Resource):
-    @ns.doc("stop_speaking")
+    @ns.doc(
+        "stop_speaking",
+        description="Stop the current speech playback",
+        responses={200: "Successfully stopped speaking", 500: "Internal server error"},
+    )
     @ns.response(200, "Success", success_response)
     @ns.response(500, "Error", error_response)
     def get(self):
