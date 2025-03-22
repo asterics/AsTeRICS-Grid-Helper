@@ -22,7 +22,7 @@ a = Analysis(
         ('speech/speech_manager.py', 'speech'),
         ('speech/__init__.py', 'speech'),
         ('speech/templates', 'speech/templates'),  # Add templates directory
-        (os.path.join(site_packages, 'tts_wrapper'), 'tts_wrapper'),  # Include tts_wrapper from site-packages
+        (os.path.join(site_packages, 'py3_tts_wrapper'), 'tts_wrapper'),  # Include tts_wrapper from site-packages
     ],
     hiddenimports=[
         'flask',
