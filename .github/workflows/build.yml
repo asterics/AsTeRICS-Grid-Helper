@@ -41,7 +41,9 @@ jobs:
       uses: astral-sh/setup-uv@v5
 
     - name: Set up Python
-      run: uv python install
+      run: |
+        uv python install
+        uv venv
 
     - name: Install dependencies
       run: |
@@ -51,7 +53,7 @@ jobs:
     - name: Install Windows-specific dependencies
       if: runner.os == 'Windows'
       run: |
-        uv pip install numpy==1.24.3
+        uv pip install numpy==1.26.4
         
     - name: Build executable
       run: |
