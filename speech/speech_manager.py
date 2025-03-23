@@ -267,42 +267,69 @@ class SpeechManager:
             return self._voices_cache
 
         all_voices = []
-        for provider_id, provider in self.providers.items():
-            try:
-                self.logger.info(f"Getting voices from provider: {provider_id}")
-                provider_voices = provider.get_voices()
-                self.logger.debug(
-                    f"Voices from provider {provider_id}: {provider_voices}"
-                )
-
-                # Add provider ID and type to each voice
-                for voice in provider_voices:
-                    # Format name as "Name (Language) - provider"
-                    base_name = voice["name"]
-                    language = voice.get("language", "")
-                    formatted_name = (
-                        f"{base_name} ({language}) - {provider_id}"
-                        if language
-                        else f"{base_name} - {provider_id}"
-                    )
+        try:
+            for provider_id, provider in self.providers.items():
+                try:
+                    self.logger.info(f"Getting voices from provider: {provider_id}")
+                    provider_voices = provider.get_voices()
                     self.logger.debug(
-                        "Formatting voice name: "
-                        f"base={base_name}, lang={language}, result={formatted_name}"
+                        f"Voices from provider {provider_id}: {provider_voices}"
                     )
 
-                    voice["name"] = formatted_name
-                    voice["providerId"] = provider_id
-                    voice["type"] = "VOICE_TYPE_EXTERNAL_DATA"
-                    self.logger.debug(f"Final voice entry: {voice}")
-                all_voices.extend(provider_voices)
-            except Exception as e:
-                self.logger.error(f"Error getting voices from {provider_id}: {e}")
-                continue
+                    # Add provider ID and type to each voice
+                    for voice in provider_voices:
+                        # Format name as "Name (Language) - provider"
+                        base_name = voice["name"]
+                        language = voice.get("language", "")
 
-        # Update cache
-        self._voices_cache = all_voices
-        self._voices_cache_timestamp = time.time()
-        return all_voices
+                        # Convert language format if needed (e.g., "English (US)" to "en-US")
+                        if language and "(" in language:
+                            lang_parts = language.split("(")
+                            if len(lang_parts) == 2:
+                                lang_code = lang_parts[1].strip(")")
+                                if lang_code == "US":
+                                    language = "en-US"
+                                elif lang_code == "UK":
+                                    language = "en-GB"
+                                # Add more mappings as needed
+
+                        formatted_name = (
+                            f"{base_name} ({language}) - {provider_id}"
+                            if language
+                            else f"{base_name} - {provider_id}"
+                        )
+                        self.logger.debug(
+                            "Formatting voice name: "
+                            f"base={base_name}, lang={language}, result={formatted_name}"
+                        )
+
+                        voice["name"] = formatted_name
+                        voice["providerId"] = provider_id
+                        voice["type"] = "VOICE_TYPE_EXTERNAL_DATA"
+                        # Ensure language_codes is a list with proper format
+                        if "language_codes" in voice:
+                            voice["language_codes"] = [language] if language else []
+                        else:
+                            voice["language_codes"] = [language] if language else []
+
+                        self.logger.debug(f"Final voice entry: {voice}")
+                    all_voices.extend(provider_voices)
+                except Exception as e:
+                    self.logger.error(f"Error getting voices from {provider_id}: {e}")
+                    continue
+
+            # Update cache
+            self._voices_cache = all_voices
+            self._voices_cache_timestamp = time.time()
+            return all_voices
+        finally:
+            # Ensure any resources are cleaned up
+            for provider in self.providers.values():
+                if hasattr(provider, "cleanup"):
+                    try:
+                        provider.cleanup()
+                    except Exception as e:
+                        self.logger.error(f"Error cleaning up provider: {e}")
 
     def speak(self, text: str, voice_id: str, provider_id: str | None = None) -> None:
         """Speak text using specified voice."""
