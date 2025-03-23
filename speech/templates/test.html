@@ -315,9 +315,12 @@
                     // Direct speak endpoint
                     const encodedText = encodeURIComponent(text);
                     const selectedVoice = allVoices.find(v => v.id === selectedVoiceId);
-                    await fetch(`/api/speak/${encodedText}/${selectedVoice.providerId}/${selectedVoiceId}`, {
+                    const apiUrl = `/api/speak/${encodedText}/${selectedVoice.providerId}/${selectedVoiceId}`;
+                    console.log('Calling speak endpoint:', apiUrl);
+                    const response = await fetch(apiUrl, {
                         method: 'POST'
                     });
+                    console.log('Speak response:', response.status, await response.text());
 
                     // Start checking speaking status
                     isSpeaking = true;
@@ -325,6 +328,7 @@
                     speakingCheckInterval = setInterval(async () => {
                         const statusResponse = await fetch('/api/speaking');
                         const status = await statusResponse.json();
+                        console.log('Speaking status:', status);
                         if (!status.speaking) {
                             clearInterval(speakingCheckInterval);
                             isSpeaking = false;
@@ -338,13 +342,16 @@
                     // Audio stream endpoint
                     const encodedText = encodeURIComponent(text);
                     const selectedVoice = allVoices.find(v => v.id === selectedVoiceId);
-                    const response = await fetch(`/api/speakdata/${encodedText}/${selectedVoice.providerId}/${selectedVoiceId}`, {
+                    const apiUrl = `/api/speakdata/${encodedText}/${selectedVoice.providerId}/${selectedVoiceId}`;
+                    console.log('Calling speakdata endpoint:', apiUrl);
+                    const response = await fetch(apiUrl, {
                         method: 'POST'
                     });
+                    console.log('Speakdata response:', response.status);
 
                     const blob = await response.blob();
-                    const url = URL.createObjectURL(blob);
-                    audioPlayer.src = url;
+                    const blobUrl = URL.createObjectURL(blob);
+                    audioPlayer.src = blobUrl;
                     audioPlayer.play();
                     
                     speakButton.disabled = false;
