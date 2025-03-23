@@ -2,6 +2,7 @@
 
 import logging
 from typing import Any
+import time
 
 from tts_wrapper import (
     ElevenLabsClient,
@@ -108,10 +109,20 @@ class SpeechManager:
 
     def __init__(self):
         """Initialize the speech manager."""
-        self.logger = logging.getLogger(__name__)
         self.providers: dict[str, CustomTTSProvider] = {}
         self.current_provider: CustomTTSProvider | None = None
+        self.logger = logging.getLogger(__name__)
+        self._voices_cache = None
+        self._voices_cache_timestamp = 0
+        self._voices_cache_ttl = 300  # Cache TTL in seconds (5 minutes)
         self.is_speaking = False
+
+    def _is_voices_cache_valid(self) -> bool:
+        """Check if the voices cache is still valid."""
+        if self._voices_cache is None:
+            return False
+        current_time = time.time()
+        return (current_time - self._voices_cache_timestamp) < self._voices_cache_ttl
 
     def init_providers(self, config: dict[str, Any]) -> None:
         """Initialize TTS providers from config."""
@@ -250,6 +261,11 @@ class SpeechManager:
 
     def get_voices(self) -> list[dict[str, Any]]:
         """Get available voices from all providers."""
+        # Check cache first
+        if self._is_voices_cache_valid():
+            self.logger.debug("Returning cached voices")
+            return self._voices_cache
+
         all_voices = []
         for provider_id, provider in self.providers.items():
             try:
@@ -270,18 +286,22 @@ class SpeechManager:
                         else f"{base_name} - {provider_id}"
                     )
                     self.logger.debug(
-                        f"Formatting voice name: base={base_name}, lang={language}, result={formatted_name}"
+                        "Formatting voice name: "
+                        f"base={base_name}, lang={language}, result={formatted_name}"
                     )
 
                     voice["name"] = formatted_name
                     voice["providerId"] = provider_id
-                    voice["type"] = "external_playing"
+                    voice["type"] = "VOICE_TYPE_EXTERNAL_DATA"
                     self.logger.debug(f"Final voice entry: {voice}")
                 all_voices.extend(provider_voices)
             except Exception as e:
                 self.logger.error(f"Error getting voices from {provider_id}: {e}")
                 continue
 
+        # Update cache
+        self._voices_cache = all_voices
+        self._voices_cache_timestamp = time.time()
         return all_voices
 
     def speak(self, text: str, voice_id: str, provider_id: str | None = None) -> None:
@@ -300,9 +320,12 @@ class SpeechManager:
             return
 
         try:
+            self.is_speaking = True
             provider.speak(text, voice_id)
+            self.is_speaking = False
         except Exception as e:
             self.logger.error(f"Error speaking text: {e}")
+            self.is_speaking = False
 
     def get_speak_data(
         self, text: str, voice_id: str, provider_id: str | None = None
@@ -322,9 +345,13 @@ class SpeechManager:
             return b""
 
         try:
-            return provider.get_speak_data(text, voice_id)
+            self.is_speaking = True
+            data = provider.get_speak_data(text, voice_id)
+            self.is_speaking = False
+            return data
         except Exception as e:
             self.logger.error(f"Error getting speech data: {e}")
+            self.is_speaking = False
             return b""
 
     def stop_speaking(self) -> None:
@@ -334,6 +361,8 @@ class SpeechManager:
                 self.current_provider.stop_speaking()
             except Exception as e:
                 self.logger.error(f"Error stopping speech: {e}")
+            finally:
+                self.is_speaking = False
 
 
 def get_voices(speech_manager: SpeechManager) -> list[dict[str, Any]]:

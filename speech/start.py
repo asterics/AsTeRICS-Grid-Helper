@@ -343,13 +343,14 @@ class Voices(Resource):
                     "providerId": voice[
                         "providerId"
                     ],  # Provider ID is set by SpeechManager
-                    "type": voice.get("type", "external_playing"),
+                    "type": voice.get("type", "external_data"),
+                    "ref": voice,  # Include the entire voice object as ref
                 }
                 transformed_voices.append(transformed_voice)
             return transformed_voices
         except Exception as e:
             logger.error(f"Error in /voices endpoint: {e!s}", exc_info=True)
-            return {"error": str(e), "status": "error", "voices": []}, 200
+            return []
 
 
 @ns.route("/speakdata/<string:text>")
