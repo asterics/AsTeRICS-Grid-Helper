@@ -1,0 +1,72 @@
+classDiagram
+    class TTSProviderAbstract {
+        <<abstract>>
+        +AudioManager audio_manager
+        +Dict _voice_cache
+        +Callable _on_start
+        +Callable _on_stop
+        +Callable _on_complete
+        +bool _was_stopped
+        +Dict config
+        +bool _cache_enabled
+        +Path _cache_dir
+        +Path _audio_cache_dir
+        +speak(text: str, voice_id: str, on_complete: Callable) bool
+        +get_speak_data(text: str, voice_id: str) bytes
+        +get_voices() list[dict]
+        +stop_speaking() void
+        +set_speech_handlers(on_start: Callable, on_stop: Callable, on_complete: Callable) void
+        +_generate_speak_data(text: str, voice_id: str) bytes*
+        +_get_cache_key(text: str, voice_id: str) str
+        +_get_cache_path(cache_key: str) Path
+        +_get_metadata_path(cache_key: str) Path
+        +_cache_audio_data(cache_key: str, audio_data: bytes, metadata: dict) void
+        +_get_cached_audio(cache_key: str) bytes
+        +_get_cached_voices() list[dict]
+    }
+
+    class AudioManager {
+        -sd.OutputStream _stream
+        -bool _is_playing
+        -Callable _on_complete
+        -Callable _on_start
+        -threading.RLock _stream_lock
+        -Exception _callback_error
+        -float _last_callback_time
+        -threading.Event _cleanup_event
+        -queue.Queue _stream_queue
+        -Path _cache_dir
+        -int _cache_size_limit
+        +play_audio(audio_data: bytes, on_complete: Callable, on_start: Callable) bool
+        +stop() void
+        +is_playing bool
+        -_stream_cleanup_worker() void
+        -_get_cache_key(audio_data: bytes) str
+        -_get_cache_path(cache_key: str) Path
+        -_cache_audio(audio_data: bytes) Path
+        -_clean_cache_if_needed() void
+        -_load_audio_data(audio_data: bytes) tuple
+        -_safe_stream_operation(operation: Callable) bool
+        -_create_stream(samplerate: int, channels: int, callback: Callable, finished_callback: Callable) bool
+        -_check_stream_timeout() void
+    }
+
+    class TTSProviderFactory {
+        +create_wrapper_provider(tts_instance: Any) TTSProviderAbstract
+        +create_provider(provider_type: str, config: dict) TTSProviderAbstract
+    }
+
+    class WrappedProvider {
+        -Any tts
+        +get_voices() list[dict]
+        +_generate_speak_data(text: str, voice_id: str) bytes
+    }
+
+    class OpenAITTSProvider {
+        +_generate_speak_data(text: str, voice_id: str) bytes
+    }
+
+    TTSProviderAbstract <|-- WrappedProvider
+    TTSProviderAbstract <|-- OpenAITTSProvider
+    TTSProviderFactory --> WrappedProvider
+    TTSProviderAbstract --> AudioManager

@@ -1,11 +1,12 @@
 """Custom TTS provider implementations."""
 
-from typing import Any
+import logging
+from typing import Any, Optional
 
-from .base_provider import CustomTTSProvider
+from .tts_provider import TTSProviderAbstract
 
 
-class OpenAITTSProvider(CustomTTSProvider):
+class OpenAITTSProvider(TTSProviderAbstract):
     """OpenAI TTS provider implementation."""
 
     def __init__(self, config: dict[str, Any] | None = None):
@@ -18,6 +19,7 @@ class OpenAITTSProvider(CustomTTSProvider):
                 - output_format: Output format (default: "wav")
         """
         super().__init__()
+        self.logger = logging.getLogger(__name__)
         self.config = config or {}
         self.api_key = self.config.get("api_key")
         if not self.api_key:
@@ -27,16 +29,26 @@ class OpenAITTSProvider(CustomTTSProvider):
         self.output_format = self.config.get("output_format", "wav")
 
         # Initialize OpenAI client
-        from openai import OpenAI
+        try:
+            import openai
+        except ImportError:
+            raise ImportError(
+                "OpenAI package not installed. Install with: uv pip install openai"
+            )
 
-        self.client = OpenAI(api_key=self.api_key)
+        self.client = openai.OpenAI(api_key=self.api_key)
 
     def get_voices(self) -> list[dict[str, Any]]:
-        """Get available OpenAI voices."""
+        """Get available OpenAI voices.
+
+        Returns:
+            List of voice dictionaries in standardized format.
+        """
         return [
             {
                 "id": voice,
                 "name": voice.capitalize(),
+                "language": "en",
                 "language_codes": ["en"],  # OpenAI voices are optimized for English
                 "gender": "Unknown",
             }
@@ -54,32 +66,16 @@ class OpenAITTSProvider(CustomTTSProvider):
             ]
         ]
 
-    def speak(self, text: str, voice_id: str) -> None:
-        """Speak text using OpenAI TTS."""
-        try:
-            # Generate audio data
-            audio_data = self.get_speak_data(text, voice_id)
-            if not audio_data:
-                raise RuntimeError("Failed to generate audio data")
+    def get_speak_data(self, text: str, voice_id: str) -> Optional[bytes]:
+        """Get WAV audio data for text using OpenAI TTS.
 
-            # Play audio using system's audio player
-            import io
+        Args:
+            text: Text to convert to speech
+            voice_id: Voice ID to use
 
-            import sounddevice as sd
-            import soundfile as sf
-
-            # Read WAV data into numpy array
-            audio_stream = io.BytesIO(audio_data)
-            data, samplerate = sf.read(audio_stream)
-
-            # Play audio
-            sd.play(data, samplerate)
-            sd.wait()
-        except Exception as e:
-            self.logger.error(f"Error speaking text: {e}")
-
-    def get_speak_data(self, text: str, voice_id: str) -> bytes:
-        """Get WAV audio data for text using OpenAI TTS."""
+        Returns:
+            Audio data as bytes, or None if synthesis failed
+        """
         try:
             # Generate speech
             response = self.client.audio.speech.create(
@@ -93,10 +89,4 @@ class OpenAITTSProvider(CustomTTSProvider):
             return response.content
         except Exception as e:
             self.logger.error(f"Error getting speech data: {e}")
-            return b""
-
-    def stop_speaking(self) -> None:
-        """Stop current speech playback."""
-        import sounddevice as sd
-
-        sd.stop()
+            return None

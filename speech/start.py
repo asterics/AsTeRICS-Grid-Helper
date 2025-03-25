@@ -30,25 +30,13 @@ sys.path.append(os.path.dirname(bundle_dir))
 
 try:
     from speech.config_manager import ConfigManager
-    from speech.speech_manager import (
-        SpeechManager,
-        get_speak_data,
-        get_voices,
-        is_speaking,
-        speak,
-        stop_speaking,
-    )
+    from speech.provider_factory import TTSProviderFactory
+    from speech.audio_manager import AudioManager
 except ImportError:
     # Fallback for when running as module
     from config_manager import ConfigManager
-    from speech_manager import (
-        SpeechManager,
-        get_speak_data,
-        get_voices,
-        is_speaking,
-        speak,
-        stop_speaking,
-    )
+    from provider_factory import TTSProviderFactory
+    from audio_manager import AudioManager
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -60,8 +48,20 @@ HTTP_NOT_FOUND = 404
 # Create configuration manager instance
 config_manager = ConfigManager()
 
-# Create speech manager instance
-speech_manager = SpeechManager()
+# Create provider factory and audio manager
+provider_factory = TTSProviderFactory()
+audio_manager = AudioManager()
+
+# Initialize providers with configuration
+config = config_manager.get_tts_config()
+providers = {}
+for engine_type in config.get("engines", []):
+    provider = provider_factory.create_provider(engine_type, config)
+    if provider:
+        providers[engine_type] = provider
+        logger.info(f"Successfully initialized {engine_type} provider")
+    else:
+        logger.error(f"Failed to initialize {engine_type} provider")
 
 # Initialize Flask-RESTX
 api = Api(
@@ -186,8 +186,16 @@ def config():
 
             if all_valid:
                 config_manager.save_config()
-                # Reinitialize speech manager with new configuration
-                speech_manager.init_providers(config_manager.get_tts_config())
+                # Reinitialize providers with new configuration
+                config = config_manager.get_tts_config()
+                providers = {}
+                for engine_type in config.get("engines", []):
+                    provider = provider_factory.create_provider(engine_type, config)
+                    if provider:
+                        providers[engine_type] = provider
+                        logger.info(f"Successfully initialized {engine_type} provider")
+                    else:
+                        logger.error(f"Failed to initialize {engine_type} provider")
                 success_message = "Configuration saved successfully"
             else:
                 error_message = "Please fix the configuration errors"
@@ -326,31 +334,25 @@ class Voices(Resource):
     def get(self):
         """Get available voices from all providers."""
         try:
-            voices = get_voices(speech_manager)
-            # Transform to match original structure while preserving all fields
-            transformed_voices = []
-            for voice in voices:
-                transformed_voice = {
-                    "id": voice["id"],
-                    "name": voice[
-                        "name"
-                    ],  # Name is already formatted correctly by SpeechManager
-                    "language": voice.get("language", ""),  # Preserve language field
-                    "language_codes": voice.get(
-                        "language_codes", []
-                    ),  # Preserve language codes
-                    "gender": voice.get("gender", "Unknown"),  # Preserve gender
-                    "providerId": voice[
-                        "providerId"
-                    ],  # Provider ID is set by SpeechManager
-                    "type": voice.get("type", "external_data"),
-                    "ref": voice,  # Include the entire voice object as ref
-                }
-                transformed_voices.append(transformed_voice)
-            return transformed_voices
+            voices = []
+            for provider_id, provider in providers.items():
+                try:
+                    provider_voices = provider.get_voices()
+                    for voice in provider_voices:
+                        voice["providerId"] = provider_id
+                        voices.append(voice)
+                except Exception as e:
+                    logger.error(f"Error getting voices from {provider_id}: {e}")
+                    continue
+
+            if not voices:
+                logger.warning("No voices available")
+                return {"status": "error", "error": "No voices available", "voices": []}
+
+            return {"status": "success", "voices": voices}
         except Exception as e:
-            logger.error(f"Error in /voices endpoint: {e!s}", exc_info=True)
-            return []
+            logger.error(f"Error in /voices endpoint: {e}", exc_info=True)
+            return {"status": "error", "error": str(e), "voices": []}
 
 
 @ns.route("/speakdata/<string:text>")
@@ -378,25 +380,39 @@ class SpeakData(Resource):
     def get(self, text: str, provider_id: str = "", voice_id: str = ""):
         """Get speech data for text."""
         try:
+            # Decode parameters
             text = unquote(text).lower()
             provider_id = unquote(provider_id)
             voice_id = unquote(voice_id)
-            data = get_speak_data(text, voice_id, provider_id, speech_manager)
-            if data is None:
+
+            logger.info(f"Generating speech data for text: {text}, voice: {voice_id}")
+
+            # Get provider and generate audio data
+            provider = providers.get(provider_id)
+            if not provider:
+                logger.error(f"Provider {provider_id} not found")
+                return {
+                    "error": f"Provider {provider_id} not found",
+                    "status": "error",
+                }, 200
+
+            audio_data = provider.get_speak_data(text, voice_id)
+            if audio_data is None:
+                logger.error("Failed to generate speech data")
                 return {
                     "error": "Failed to generate speech data",
                     "status": "error",
                 }, 200
 
-            # The data is already a complete WAV file from synth_to_file
+            logger.info("Successfully generated speech data")
             return send_file(
-                io.BytesIO(data),
+                io.BytesIO(audio_data),
                 mimetype="audio/wav",
                 as_attachment=False,
                 download_name="speech.wav",
             )
         except Exception as e:
-            logger.error(f"Error in /speakdata endpoint: {e!s}", exc_info=True)
+            logger.error(f"Error in /speakdata endpoint: {e}", exc_info=True)
             return {"error": str(e), "status": "error"}, 200
 
     def post(self, text: str, provider_id: str = "", voice_id: str = ""):
@@ -426,13 +442,49 @@ class Speak(Resource):
     def get(self, text: str, provider_id: str = "", voice_id: str = ""):
         """Speak text using specified voice."""
         try:
+            # Decode parameters
             text = unquote(text).lower()
             provider_id = unquote(provider_id)
             voice_id = unquote(voice_id)
-            speak(text, voice_id, provider_id, speech_manager)
+
+            logger.info(f"Starting speech for text: {text}, voice: {voice_id}")
+
+            # Get provider and generate audio data
+            provider = providers.get(provider_id)
+            if not provider:
+                logger.error(f"Provider {provider_id} not found")
+                return {
+                    "error": f"Provider {provider_id} not found",
+                    "status": "error",
+                }, 200
+
+            audio_data = provider.get_speak_data(text, voice_id)
+            if audio_data is None:
+                logger.error("Failed to generate speech data")
+                return {
+                    "error": "Failed to generate speech data",
+                    "status": "error",
+                }, 200
+
+            # Start speaking with callbacks
+            def on_complete():
+                logger.info("Speech playback completed")
+
+            def on_error(error):
+                logger.error(f"Speech playback error: {error}")
+                logger.debug(f"Error callback called with error: {error}")
+
+            logger.debug("Starting audio playback with callbacks")
+            logger.debug(f"Audio data size: {len(audio_data)} bytes")
+            success = audio_manager.play_audio(audio_data, on_complete, on_error)
+            if not success:
+                logger.error("Failed to start speech")
+                return {"error": "Failed to start speech", "status": "error"}, 200
+
+            logger.info("Successfully started speech")
             return {"status": "success"}
         except Exception as e:
-            logger.error(f"Error in /speak endpoint: {e!s}", exc_info=True)
+            logger.error(f"Error in /speak endpoint: {e}", exc_info=True)
             return {"error": str(e), "status": "error"}, 200
 
     def post(self, text: str, provider_id: str = "", voice_id: str = ""):
@@ -443,13 +495,55 @@ class Speak(Resource):
 @app.route("/cache/<text>/<provider_id>/<voice_id>", methods=["POST", "GET"])
 def cache_data(text: str, provider_id: str = "", voice_id: str = ""):
     """Cache speech data for the given text."""
-    if not config_manager.config["General"]["cache_enabled"]:
-        return jsonify(False)
-    text = unquote(text).lower()
-    provider_id = unquote(provider_id)
-    voice_id = unquote(voice_id)
-    get_speak_data(text, voice_id, provider_id, speech_manager)
-    return jsonify(True)
+    try:
+        # Check if caching is enabled
+        if not config_manager.config["General"].get("cache_enabled", False):
+            logger.info("Caching is disabled in configuration")
+            return jsonify(
+                {"status": "error", "message": "Caching is disabled in configuration"}
+            )
+
+        # Get cache directory from config
+        cache_dir = config_manager.config["General"].get("cache_dir", "temp")
+        logger.info(f"Using cache directory: {cache_dir}")
+
+        # Decode parameters
+        text = unquote(text).lower()
+        provider_id = unquote(provider_id)
+        voice_id = unquote(voice_id)
+
+        # Get provider and generate audio data
+        provider = providers.get(provider_id)
+        if not provider:
+            logger.error(f"Provider {provider_id} not found")
+            return jsonify(
+                {"status": "error", "message": f"Provider {provider_id} not found"}
+            )
+
+        # Get speech data (this will cache it if caching is enabled)
+        logger.info(
+            f"Attempting to cache speech data for text: {text}, voice: {voice_id}"
+        )
+        audio_data = provider.get_speak_data(text, voice_id)
+
+        if audio_data:
+            logger.info("Successfully cached speech data")
+            return jsonify(
+                {
+                    "status": "success",
+                    "message": "Speech data cached successfully",
+                    "cache_dir": cache_dir,
+                }
+            )
+        else:
+            logger.error("Failed to generate speech data for caching")
+            return jsonify(
+                {"status": "error", "message": "Failed to generate speech data"}
+            )
+
+    except Exception as e:
+        logger.error(f"Error in cache endpoint: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": str(e)})
 
 
 @ns.route("/speaking")
@@ -467,10 +561,11 @@ class Speaking(Resource):
     def get(self):
         """Check if text is being spoken."""
         try:
-            speaking = is_speaking(speech_manager)
+            speaking = audio_manager.is_playing
+            logger.debug(f"Speaking status: {speaking}")
             return {"speaking": speaking, "status": "success"}
         except Exception as e:
-            logger.error(f"Error in /speaking endpoint: {e!s}", exc_info=True)
+            logger.error(f"Error in /speaking endpoint: {e}", exc_info=True)
             return {"error": str(e), "status": "error", "speaking": False}, 200
 
 
@@ -486,10 +581,12 @@ class Stop(Resource):
     def get(self):
         """Stop speaking."""
         try:
-            stop_speaking(speech_manager)
+            logger.info("Stopping speech playback")
+            audio_manager.stop_speaking()
+            logger.info("Successfully stopped speech playback")
             return {"status": "success"}
         except Exception as e:
-            logger.error(f"Error in /stop endpoint: {e!s}", exc_info=True)
+            logger.error(f"Error in /stop endpoint: {e}", exc_info=True)
             return {"error": str(e), "status": "error"}, 200
 
     def post(self):
@@ -506,9 +603,6 @@ def test():
 def start_server():
     """Start the Flask server."""
     try:
-        # Initialize speech providers with configuration
-        speech_manager.init_providers(config_manager.get_tts_config())
-
         # Start Flask server
         app.run(
             host="127.0.0.1",

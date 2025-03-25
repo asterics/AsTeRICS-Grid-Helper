@@ -193,8 +193,13 @@
         async function loadVoices() {
             try {
                 const response = await fetch('/api/voices');
-                const voices = await response.json();
+                const data = await response.json();
                 
+                if (!data || data.status !== 'success') {
+                    throw new Error(data.error || 'Failed to load voices');
+                }
+
+                const voices = data.voices;
                 if (!voices || !Array.isArray(voices)) {
                     throw new Error('Invalid voice data received');
                 }
@@ -289,73 +294,119 @@
         // Handle form submission
         document.getElementById('testForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            const text = document.getElementById('testText').value.trim();
+            const endpoint = document.querySelector('input[name="endpoint"]:checked').value;
+            const voiceId = selectedVoiceId;
             
-            if (!selectedVoiceId) {
-                alert('Please select a voice first.');
+            // Get the voice object to get the correct providerId
+            const selectedVoice = allVoices.find(v => v.id === voiceId);
+            if (!selectedVoice) {
+                alert('Selected voice not found');
                 return;
             }
+            const providerId = selectedVoice.providerId;
 
-            const text = document.getElementById('testText').value.trim();
             if (!text) {
                 alert('Please enter some text to speak.');
                 return;
             }
 
-            const endpoint = document.querySelector('input[name="endpoint"]:checked').value;
+            if (!voiceId) {
+                alert('Please select a voice first.');
+                return;
+            }
+
             const speakButton = document.getElementById('speakButton');
             const stopButton = document.getElementById('stopButton');
             const speakingStatus = document.getElementById('speakingStatus');
-            const audioPlayer = document.getElementById('audioPlayer');
 
+            // Disable speak button and enable stop button
             speakButton.disabled = true;
             stopButton.disabled = false;
 
             try {
+                const encodedText = encodeURIComponent(text);
+                const apiUrl = `/api/${endpoint}/${encodedText}/${providerId}/${voiceId}`;
+                console.log('Calling endpoint:', apiUrl);
+
                 if (endpoint === 'speak') {
                     // Direct speak endpoint
-                    const encodedText = encodeURIComponent(text);
-                    const selectedVoice = allVoices.find(v => v.id === selectedVoiceId);
-                    const apiUrl = `/api/speak/${encodedText}/${selectedVoice.providerId}/${selectedVoiceId}`;
-                    console.log('Calling speak endpoint:', apiUrl);
                     const response = await fetch(apiUrl, {
                         method: 'POST'
                     });
                     console.log('Speak response:', response.status, await response.text());
 
-                    // Start checking speaking status
-                    isSpeaking = true;
-                    speakingStatus.classList.add('active');
-                    speakingCheckInterval = setInterval(async () => {
-                        const statusResponse = await fetch('/api/speaking');
-                        const status = await statusResponse.json();
-                        console.log('Speaking status:', status);
-                        if (!status.speaking) {
+                    // Start speaking status check
+                    let speakingCheckInterval = setInterval(async () => {
+                        try {
+                            const response = await fetch("/api/speaking");
+                            const data = await response.json();
+                            console.log("Speaking status:", data);
+
+                            if (!data.speaking) {
+                                // Clear the interval first
+                                clearInterval(speakingCheckInterval);
+                                speakingCheckInterval = null;
+                                
+                                // Reset button states
+                                speakButton.disabled = false;
+                                stopButton.disabled = true;
+                                console.log("Speech finished or timed out, re-enabling speak button");
+                            }
+                        } catch (error) {
+                            console.error("Error checking speaking status:", error);
+                            // Clear interval on error
                             clearInterval(speakingCheckInterval);
-                            isSpeaking = false;
-                            speakingStatus.classList.remove('active');
+                            speakingCheckInterval = null;
+                            
+                            // Reset button states
                             speakButton.disabled = false;
                             stopButton.disabled = true;
                         }
                     }, 500);
 
+                    // Add timeout to ensure speak button is re-enabled
+                    setTimeout(() => {
+                        if (speakingCheckInterval) {
+                            clearInterval(speakingCheckInterval);
+                            speakingCheckInterval = null;
+                        }
+                        speakButton.disabled = false;
+                        stopButton.disabled = true;
+                        console.log("Speech timeout, re-enabling speak button");
+                    }, 5000); // 5 second timeout
+
+                    // Store interval ID for cleanup
+                    speakButton.dataset.speakingCheckInterval = speakingCheckInterval;
                 } else {
                     // Audio stream endpoint
-                    const encodedText = encodeURIComponent(text);
-                    const selectedVoice = allVoices.find(v => v.id === selectedVoiceId);
-                    const apiUrl = `/api/speakdata/${encodedText}/${selectedVoice.providerId}/${selectedVoiceId}`;
-                    console.log('Calling speakdata endpoint:', apiUrl);
-                    const response = await fetch(apiUrl, {
-                        method: 'POST'
-                    });
-                    console.log('Speakdata response:', response.status);
-
-                    const blob = await response.blob();
-                    const blobUrl = URL.createObjectURL(blob);
-                    audioPlayer.src = blobUrl;
-                    audioPlayer.play();
+                    const response = await fetch(apiUrl);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
                     
-                    speakButton.disabled = false;
-                    stopButton.disabled = true;
+                    // Get the audio data as a blob
+                    const audioBlob = await response.blob();
+                    
+                    // Create an object URL for the blob
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    
+                    // Set the audio source and show the player
+                    const audioPlayer = document.getElementById('audioPlayer');
+                    audioPlayer.src = audioUrl;
+                    audioPlayer.style.display = 'block';
+                    
+                    // Play the audio
+                    await audioPlayer.play();
+                    
+                    // Reset button states when audio ends
+                    audioPlayer.onended = () => {
+                        speakButton.disabled = false;
+                        stopButton.disabled = true;
+                        audioPlayer.style.display = 'none';
+                        // Clean up the object URL
+                        URL.revokeObjectURL(audioUrl);
+                    };
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -366,27 +417,30 @@
             }
         });
 
-        // Handle stop button
-        document.getElementById('stopButton').addEventListener('click', async () => {
+        // Stop button handler
+        document.getElementById('stopButton').addEventListener("click", async () => {
             try {
-                await fetch('/api/stop', { method: 'POST' });
-                if (speakingCheckInterval) {
-                    clearInterval(speakingCheckInterval);
+                const response = await fetch("/api/stop", { method: "POST" });
+                const data = await response.json();
+                console.log("Stop response:", data);
+
+                // Clear speaking check interval if it exists
+                if (speakButton.dataset.speakingCheckInterval) {
+                    clearInterval(parseInt(speakButton.dataset.speakingCheckInterval));
+                    speakButton.dataset.speakingCheckInterval = "";
                 }
-                document.getElementById('speakingStatus').classList.remove('active');
-                document.getElementById('speakButton').disabled = false;
-                document.getElementById('stopButton').disabled = true;
+
+                // Reset button states
+                speakButton.disabled = false;
+                stopButton.disabled = true;
+                console.log("Speech stopped, re-enabling speak button");
             } catch (error) {
-                console.error('Error stopping speech:', error);
+                console.error("Error stopping speech:", error);
+                // Reset button states even on error
+                speakButton.disabled = false;
+                stopButton.disabled = true;
             }
         });
-
-        // Initialize
-        loadVoices();
-
-        // Update the search functionality
-        document.getElementById('voiceSearch').addEventListener('input', filterVoices);
-        document.getElementById('searchField').addEventListener('change', filterVoices);
 
         // Handle voice selection
         function selectVoice(voiceId) {
@@ -403,6 +457,15 @@
                 }
             });
         }
+
+        // Update the search functionality
+        document.getElementById('voiceSearch').addEventListener('input', filterVoices);
+        document.getElementById('searchField').addEventListener('change', filterVoices);
+
+        // Initialize when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            loadVoices();
+        });
     </script>
 </body>
 </html> 
