@@ -29,14 +29,14 @@ CORS(app)
 sys.path.append(os.path.dirname(bundle_dir))
 
 try:
+    from speech.audio_manager import AudioManager
     from speech.config_manager import ConfigManager
     from speech.provider_factory import TTSProviderFactory
-    from speech.audio_manager import AudioManager
 except ImportError:
     # Fallback for when running as module
+    from audio_manager import AudioManager
     from config_manager import ConfigManager
     from provider_factory import TTSProviderFactory
-    from audio_manager import AudioManager
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -322,6 +322,19 @@ def handle_error(error):
     return jsonify({"error": str(error), "status": "error"}), 200
 
 
+langcodes_param = ns.model(
+    "LangcodesParam",
+    {
+        "langcodes": fields.String(
+            description="Language code format to return",
+            enum=["bcp47", "iso639_3", "display", "all"],
+            default="bcp47",
+            required=False,
+        )
+    },
+)
+
+
 @ns.route("/voices")
 class Voices(Resource):
     @ns.doc(
@@ -331,13 +344,24 @@ class Voices(Resource):
     )
     @ns.response(200, "Success", voices_response)
     @ns.response(500, "Error", error_response)
+    @ns.param(
+        "langcodes",
+        "Language code format to return (bcp47, iso639_3, display, or all)",
+        _in="query",
+        default="bcp47",
+    )
     def get(self):
         """Get available voices from all providers."""
         try:
+            # Get langcodes parameter from query string
+            langcodes = request.args.get("langcodes", "bcp47")
+            if langcodes not in ["bcp47", "iso639_3", "display", "all"]:
+                langcodes = "bcp47"  # Default to BCP-47 format
+
             voices = []
             for provider_id, provider in providers.items():
                 try:
-                    provider_voices = provider.get_voices()
+                    provider_voices = provider.get_voices(langcodes=langcodes)
                     for voice in provider_voices:
                         voice["providerId"] = provider_id
                         voices.append(voice)
@@ -600,13 +624,13 @@ def test():
     return render_template("test.html")
 
 
-def start_server():
+def start_server(port=5555):
     """Start the Flask server."""
     try:
         # Start Flask server
         app.run(
             host="127.0.0.1",
-            port=5555,
+            port=port,
             debug=False,  # Disable debug mode
             use_reloader=False,  # Disable the reloader
         )
@@ -616,4 +640,16 @@ def start_server():
 
 
 if __name__ == "__main__":
-    start_server()
+    import argparse
+
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Start the speech service")
+    parser.add_argument(
+        "--port", type=int, default=5555, help="Port to run the server on"
+    )
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
+
+    args = parser.parse_args()
+
+    # Start the server
+    start_server(port=args.port)

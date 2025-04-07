@@ -1,14 +1,18 @@
+#!/usr/bin/env python
+
 """Test harness for TTS providers."""
 
 import asyncio
 import json
 import logging
+import time
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 
-from speech.tts_provider import TTSProviderAbstract
-from speech.provider_factory import TTSProviderFactory
+from speech.audio_manager import AudioManager
 from speech.config_manager import ConfigManager
+from speech.provider_factory import TTSProviderFactory
+from speech.tts_provider import TTSProviderAbstract
 
 # Configure logging
 logging.basicConfig(
@@ -28,6 +32,12 @@ summary_handler.setFormatter(logging.Formatter("%(message)s"))
 summary_logger.addHandler(summary_handler)
 summary_logger.setLevel(logging.INFO)
 
+# Test text
+TEST_TEXT = "This is a test sentence for the TTS engine."
+
+# Create audio manager instance
+audio_manager = AudioManager()
+
 
 def log_summary(message: str) -> None:
     """Log a message to both the summary file and console."""
@@ -41,9 +51,9 @@ class EngineTester:
     def __init__(self) -> None:
         """Initialize the engine tester."""
         self.config_manager = ConfigManager()
-        self.providers: Dict[str, TTSProviderAbstract] = {}
+        self.providers: dict[str, TTSProviderAbstract] = {}
         self.test_text = "Hello! This is a test of the text-to-speech system."
-        self.summary_data: Dict[str, Any] = {
+        self.summary_data: dict[str, Any] = {
             "timestamp": datetime.now().isoformat(),
             "providers": {},
         }
@@ -84,7 +94,7 @@ class EngineTester:
             logger.error(f"Error checking credentials for {provider_id}: {e}")
             return False
 
-    def print_voice_info(self, voice: Dict[str, Any], provider_id: str) -> None:
+    def print_voice_info(self, voice: dict[str, Any], provider_id: str) -> None:
         """Print detailed information about a voice.
 
         Args:
@@ -105,7 +115,7 @@ class EngineTester:
             for issue in issues:
                 logger.warning(f"    - {issue}")
 
-    def _check_voice_issues(self, voice: Dict[str, Any]) -> List[str]:
+    def _check_voice_issues(self, voice: dict[str, Any]) -> list[str]:
         """Check for potential issues in voice data.
 
         Args:
@@ -138,17 +148,17 @@ class EngineTester:
         sanitized: dict[str, Any] = {}
         for key, value in voice.items():
             # Handle common types
-            if isinstance(value, (str, int, float, bool, type(None))):
+            if isinstance(value, str | int | float | bool | type(None)):
                 sanitized[key] = value
             # Handle lists/tuples
-            elif isinstance(value, (list, tuple)):
+            elif isinstance(value, list | tuple):
                 sanitized[key] = [
                     (
                         self._sanitize_voice_data(item)
                         if isinstance(item, dict)
                         else (
                             str(item)
-                            if not isinstance(item, (str, int, float, bool, type(None)))
+                            if not isinstance(item, str | int | float | bool | type(None))
                             else item
                         )
                     )
@@ -227,11 +237,11 @@ class EngineTester:
                     return
                 logger.info(f"✓ Successfully got speech data ({len(audio_data)} bytes)")
             except Exception as e:
-                logger.error(f"Failed to get speech data: {str(e)}")
+                logger.error(f"Failed to get speech data: {e!s}")
                 self.summary_data["providers"][provider_id]["speech_test"] = "failed"
                 self.summary_data["providers"][provider_id][
                     "speech_error"
-                ] = f"Speech data error: {str(e)}"
+                ] = f"Speech data error: {e!s}"
                 return
 
             # Test 1: Basic speech with events
@@ -274,7 +284,7 @@ class EngineTester:
             try:
                 await asyncio.wait_for(start_event.wait(), timeout=2)
                 logger.info("✓ Speech started")
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.error("Speech did not start within timeout")
                 provider.stop_speaking()  # Ensure cleanup
                 self.summary_data["providers"][provider_id]["speech_test"] = "failed"
@@ -302,7 +312,7 @@ class EngineTester:
             try:
                 await asyncio.wait_for(stop_event.wait(), timeout=2)
                 logger.info("✓ Stop event received")
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.error("Stop event not received within timeout")
                 self.summary_data["providers"][provider_id]["speech_test"] = "failed"
                 self.summary_data["providers"][provider_id][
@@ -373,7 +383,7 @@ class EngineTester:
                     ] = "Still active after completion"
                     return
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.error("Full playback did not complete within timeout")
                 provider.stop_speaking()  # Ensure cleanup
                 self.summary_data["providers"][provider_id]["speech_test"] = "failed"
@@ -386,7 +396,7 @@ class EngineTester:
             self.summary_data["providers"][provider_id]["speech_test"] = "success"
 
         except Exception as e:
-            logger.error(f"Error testing speech functionality: {str(e)}")
+            logger.error(f"Error testing speech functionality: {e!s}")
             logger.exception(f"Detailed error for {provider_id}:")
             self.summary_data["providers"][provider_id]["speech_test"] = "error"
             self.summary_data["providers"][provider_id]["speech_error"] = str(e)
@@ -394,7 +404,7 @@ class EngineTester:
             try:
                 provider.stop_speaking()
             except Exception as cleanup_error:
-                logger.debug(f"Cleanup error: {str(cleanup_error)}")
+                logger.debug(f"Cleanup error: {cleanup_error!s}")
                 pass
 
     async def run_tests(self) -> None:
@@ -450,6 +460,64 @@ class EngineTester:
         # Save detailed summary to JSON
         with open("test_summary.json", "w") as f:
             json.dump(self.summary_data, f, indent=2)
+
+
+def test_provider(provider: TTSProviderAbstract, provider_name: str) -> bool:
+    """Test a TTS provider.
+
+    Args:
+        provider: Provider instance to test
+        provider_name: Name of the provider for logging
+
+    Returns:
+        True if all tests passed
+    """
+    try:
+        logger.info(f"\n=== Testing {provider_name} ===")
+
+        # Test 1: Get voices
+        logger.info("Getting available voices...")
+        voices = provider.get_voices()
+        if not voices:
+            logger.error(f"No voices available for {provider_name}")
+            return False
+        logger.info(f"Found {len(voices)} voices")
+        for voice in voices:
+            logger.info(f"Voice: {voice['name']} ({voice['id']})")
+
+        # Test 2: Generate speech data
+        logger.info("\nGenerating speech data...")
+        audio_data = provider.get_speak_data(TEST_TEXT, voices[0]["id"])
+        if audio_data is None:
+            logger.error(f"Failed to generate speech data for {provider_name}")
+            return False
+        logger.info(f"Generated {len(audio_data)} bytes of audio data")
+
+        # Test 3: Play audio
+        logger.info("\nPlaying audio...")
+        success = audio_manager.play_audio(
+            audio_data,
+            on_complete=lambda: logger.info(f"{provider_name} playback completed"),
+            on_error=lambda e: logger.error(f"{provider_name} playback error: {e}"),
+        )
+        if not success:
+            logger.error(f"Failed to start playback for {provider_name}")
+            return False
+
+        # Wait for completion
+        while audio_manager.is_playing:
+            time.sleep(0.1)
+        time.sleep(1)
+
+        logger.info(f"\n{provider_name} tests completed successfully!")
+        return True
+
+    except Exception as e:
+        logger.error(f"Error testing {provider_name}: {e}", exc_info=True)
+        return False
+    finally:
+        # Ensure cleanup
+        audio_manager.stop()
 
 
 def main() -> None:

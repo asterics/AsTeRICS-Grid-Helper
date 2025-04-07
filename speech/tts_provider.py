@@ -1,27 +1,29 @@
 """Abstract base class for TTS providers."""
 
-import logging
-from abc import ABC, abstractmethod
-from typing import Optional, Callable, Any, Dict
-from functools import lru_cache
-from .audio_manager import AudioManager
 import hashlib
-from pathlib import Path
 import json
+import logging
 import time
+from abc import ABC, abstractmethod
+from collections.abc import Callable
+from functools import lru_cache
+from pathlib import Path
+from typing import Any
+
+from .audio_manager import AudioManager
 
 
 class TTSProviderAbstract(ABC):
     """Abstract base class for all TTS providers."""
 
-    def __init__(self, config: Optional[Dict] = None):
+    def __init__(self, config: dict | None = None):
         """Initialize the TTS provider with audio management."""
         self.audio_manager = AudioManager()
         self.logger = logging.getLogger(__name__)
-        self._voice_cache: Dict[str, list[dict[str, Any]]] = {}
-        self._on_start: Optional[Callable] = None
-        self._on_stop: Optional[Callable] = None
-        self._on_complete: Optional[Callable] = None
+        self._voice_cache: dict[str, list[dict[str, Any]]] = {}
+        self._on_start: Callable | None = None
+        self._on_stop: Callable | None = None
+        self._on_complete: Callable | None = None
         self._was_stopped = False
 
         # Setup caching
@@ -35,7 +37,7 @@ class TTSProviderAbstract(ABC):
     def _get_cache_key(self, text: str, voice_id: str) -> str:
         """Generate cache key for audio data."""
         # Create a unique key based on text and voice
-        key_data = f"{text}:{voice_id}".encode("utf-8")
+        key_data = f"{text}:{voice_id}".encode()
         return hashlib.md5(key_data).hexdigest()
 
     def _get_cache_path(self, cache_key: str) -> Path:
@@ -47,7 +49,7 @@ class TTSProviderAbstract(ABC):
         return self._audio_cache_dir / f"{cache_key}.json"
 
     def _cache_audio_data(
-        self, cache_key: str, audio_data: bytes, metadata: Dict
+        self, cache_key: str, audio_data: bytes, metadata: dict
     ) -> None:
         """Cache audio data and metadata."""
         if not self._cache_enabled:
@@ -68,7 +70,7 @@ class TTSProviderAbstract(ABC):
         except Exception as e:
             self.logger.error(f"Error caching audio data: {e}")
 
-    def _get_cached_audio(self, cache_key: str) -> Optional[bytes]:
+    def _get_cached_audio(self, cache_key: str) -> bytes | None:
         """Get cached audio data if available."""
         if not self._cache_enabled:
             return None
@@ -79,8 +81,8 @@ class TTSProviderAbstract(ABC):
 
             if audio_path.exists() and meta_path.exists():
                 # Load metadata to verify cache validity
-                with open(meta_path, "r") as f:
-                    metadata = json.load(f)
+                with open(meta_path) as f:
+                    json.load(f)
 
                 # TODO: Add cache validation based on metadata
                 # For now, just return the cached audio
@@ -92,7 +94,7 @@ class TTSProviderAbstract(ABC):
             self.logger.error(f"Error reading cached audio: {e}")
         return None
 
-    def get_speak_data(self, text: str, voice_id: str) -> Optional[bytes]:
+    def get_speak_data(self, text: str, voice_id: str) -> bytes | None:
         """Get audio data for text, using cache if available."""
         # If caching is disabled, just generate new audio
         if not self._cache_enabled:
@@ -113,7 +115,7 @@ class TTSProviderAbstract(ABC):
         return audio_data
 
     @abstractmethod
-    def _generate_speak_data(self, text: str, voice_id: str) -> Optional[bytes]:
+    def _generate_speak_data(self, text: str, voice_id: str) -> bytes | None:
         """Generate audio data for text. Must be implemented by concrete providers.
 
         Args:
@@ -126,7 +128,7 @@ class TTSProviderAbstract(ABC):
         pass
 
     def speak(
-        self, text: str, voice_id: str, on_complete: Optional[Callable] = None
+        self, text: str, voice_id: str, on_complete: Callable | None = None
     ) -> bool:
         """Speak text using specified voice.
 
@@ -176,31 +178,63 @@ class TTSProviderAbstract(ABC):
             return False
 
     @abstractmethod
-    def get_voices(self) -> list[dict[str, Any]]:
-        """Get available voices. Must be implemented by concrete providers.
+    def get_voices(self, langcodes: str = "bcp47") -> list[dict[str, Any]]:
+        """Get available voices with specified language code format.
+
+        Args:
+            langcodes: Language code format to return. Options are:
+                - "bcp47": BCP-47 format (default)
+                - "iso639_3": ISO 639-3 format
+                - "display": Human-readable display names
+                - "all": All formats in a dictionary
 
         Returns:
-            List of voice dictionaries with standardized format:
+            List of voice dictionaries with standardized format.
+
+            For bcp47, iso639_3, and display formats:
             {
                 "id": str,
                 "name": str,
-                "language": str,
-                "language_codes": list[str],
+                "language_codes": list[str],  # Format depends on langcodes parameter
+                "gender": str
+            }
+
+            For "all" format:
+            {
+                "id": str,
+                "name": str,
+                "language_codes": {  # Dictionary of language codes
+                    "<lang_code>": {
+                        "bcp47": str,
+                        "iso639_3": str,
+                        "display": str
+                    }
+                },
                 "gender": str
             }
         """
         pass
 
     @lru_cache(maxsize=100)
-    def _get_cached_voices(self) -> list[dict[str, Any]]:
-        """Get cached list of voices, fetching from provider if not cached."""
-        return self.get_voices()
+    def _get_cached_voices(self, langcodes: str = "bcp47") -> list[dict[str, Any]]:
+        """Get cached list of voices, fetching from provider if not cached.
 
-    def get_cached_voices(self, force_refresh: bool = False) -> list[dict[str, Any]]:
+        Args:
+            langcodes: Language code format to return
+
+        Returns:
+            List of voice dictionaries
+        """
+        return self.get_voices(langcodes=langcodes)
+
+    def get_cached_voices(
+        self, force_refresh: bool = False, langcodes: str = "bcp47"
+    ) -> list[dict[str, Any]]:
         """Get list of available voices, using cache if available.
 
         Args:
             force_refresh: If True, ignore cache and fetch fresh data
+            langcodes: Language code format to return
 
         Returns:
             List of voice dictionaries
@@ -209,7 +243,7 @@ class TTSProviderAbstract(ABC):
             # Clear the cache and fetch fresh data
             self._get_cached_voices.cache_clear()
 
-        return self._get_cached_voices()
+        return self._get_cached_voices(langcodes=langcodes)
 
     def stop_speaking(self) -> None:
         """Stop current speech playback."""
@@ -230,9 +264,9 @@ class TTSProviderAbstract(ABC):
 
     def set_speech_handlers(
         self,
-        on_start: Optional[Callable] = None,
-        on_stop: Optional[Callable] = None,
-        on_complete: Optional[Callable] = None,
+        on_start: Callable | None = None,
+        on_stop: Callable | None = None,
+        on_complete: Callable | None = None,
     ) -> None:
         """Set handlers for speech events.
 

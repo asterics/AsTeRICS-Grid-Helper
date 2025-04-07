@@ -1,7 +1,7 @@
 """Custom TTS provider implementations."""
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from .tts_provider import TTSProviderAbstract
 
@@ -38,36 +38,89 @@ class OpenAITTSProvider(TTSProviderAbstract):
 
         self.client = openai.OpenAI(api_key=self.api_key)
 
-    def get_voices(self) -> list[dict[str, Any]]:
-        """Get available OpenAI voices.
+    def get_voices(self, langcodes: str = "bcp47") -> list[dict[str, Any]]:
+        """Get available OpenAI voices with specified language code format.
+
+        Args:
+            langcodes: Language code format to return. Options are:
+                - "bcp47": BCP-47 format (default)
+                - "iso639_3": ISO 639-3 format
+                - "display": Human-readable display names
+                - "all": All formats in a dictionary
 
         Returns:
             List of voice dictionaries in standardized format.
         """
-        return [
-            {
-                "id": voice,
-                "name": voice.capitalize(),
-                "language": "en",
-                "language_codes": ["en"],  # OpenAI voices are optimized for English
-                "gender": "Unknown",
-            }
-            for voice in [
-                "alloy",
-                "ash",
-                "ballad",
-                "coral",
-                "echo",
-                "fable",
-                "onyx",
-                "nova",
-                "sage",
-                "shimmer",
-            ]
+        voices = [
+            "alloy",
+            "ash",
+            "ballad",
+            "coral",
+            "echo",
+            "fable",
+            "onyx",
+            "nova",
+            "sage",
+            "shimmer",
         ]
 
-    def get_speak_data(self, text: str, voice_id: str) -> Optional[bytes]:
-        """Get WAV audio data for text using OpenAI TTS.
+        # Format language codes based on requested format
+        if langcodes == "bcp47":
+            return [
+                {
+                    "id": voice,
+                    "name": voice.capitalize(),
+                    "language_codes": ["en"],  # OpenAI voices are optimized for English
+                    "gender": "Unknown",
+                }
+                for voice in voices
+            ]
+        elif langcodes == "iso639_3":
+            return [
+                {
+                    "id": voice,
+                    "name": voice.capitalize(),
+                    "language_codes": ["eng"],  # ISO 639-3 code for English
+                    "gender": "Unknown",
+                }
+                for voice in voices
+            ]
+        elif langcodes == "display":
+            return [
+                {
+                    "id": voice,
+                    "name": voice.capitalize(),
+                    "language_codes": ["English"],  # Human-readable name
+                    "gender": "Unknown",
+                }
+                for voice in voices
+            ]
+        elif langcodes == "all":
+            return [
+                {
+                    "id": voice,
+                    "name": voice.capitalize(),
+                    "language_codes": {
+                        "en": {"bcp47": "en", "iso639_3": "eng", "display": "English"}
+                    },
+                    "gender": "Unknown",
+                }
+                for voice in voices
+            ]
+        else:
+            # Default to BCP-47 format
+            return [
+                {
+                    "id": voice,
+                    "name": voice.capitalize(),
+                    "language_codes": ["en"],
+                    "gender": "Unknown",
+                }
+                for voice in voices
+            ]
+
+    def _generate_speak_data(self, text: str, voice_id: str) -> bytes | None:
+        """Generate WAV audio data for text using OpenAI TTS.
 
         Args:
             text: Text to convert to speech

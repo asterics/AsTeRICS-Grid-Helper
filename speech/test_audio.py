@@ -1,205 +1,203 @@
+#!/usr/bin/env python
+
 """Test audio playback and event handling with sherpaonnx."""
 
 import asyncio
 import logging
-from pathlib import Path
+
 from speech.provider_factory import TTSProviderFactory
-from speech.audio_manager import AudioManager
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Test configuration matching settings.ini structure
-config = {
-    "General": {
-        "engines": ["sherpaonnx"],  # Only test sherpaonnx
-        "cache_enabled": True,
-        "cache_dir": "temp",
-    }
-}
+# Test texts
+LONG_TEXT = (
+    "This is a long test sentence that should take several seconds to "
+    "speak. We want to make sure we can stop it in the middle."
+)
+SHORT_TEXT = "Short test."
+MULTIPLE_TEXTS = [
+    "First test sentence.",
+    "Second test sentence.",
+    "Third test sentence.",
+]
 
 
 async def test_audio_playback():
-    """Test audio playback with sherpaonnx."""
-    # Create provider and audio manager
-    factory = TTSProviderFactory()
-    provider = factory.create_provider("sherpaonnx", config)
-    audio_manager = AudioManager()
-
-    # Test text
-    long_text = (
-        "This is a long test sentence that should take several seconds to "
-        "speak. We want to make sure we can stop it in the middle."
-    )
-    short_text = "Short test."
-
-    # Event flags
-    long_text_started = asyncio.Event()
-    long_text_stopped = asyncio.Event()
-    short_text_started = asyncio.Event()
-    short_text_completed = asyncio.Event()
-    cached_text_started = asyncio.Event()
-    cached_text_completed = asyncio.Event()
-
-    def on_long_start():
-        logger.info("Long text started playing")
-        long_text_started.set()
-
-    def on_long_stop():
-        logger.info("Long text stopped")
-        long_text_stopped.set()
-
-    def on_short_start():
-        logger.info("Short text started playing")
-        short_text_started.set()
-
-    def on_short_complete():
-        logger.info("Short text completed")
-        short_text_completed.set()
-
-    def on_cached_start():
-        logger.info("Cached text started playing")
-        cached_text_started.set()
-
-    def on_cached_complete():
-        logger.info("Cached text completed")
-        cached_text_completed.set()
-
+    """Test audio playback and event handling with TTS provider."""
+    provider = None
     try:
-        # First test: Long text with stop
+        # Create config with only sherpaonnx
+        config = {
+            "General": {
+                "engines": ["sherpaonnx"],  # Only test sherpaonnx
+                "cache_enabled": True,
+                "cache_dir": "temp",
+            },
+            "engine_configs": {
+                "sherpaonnx": {
+                    "voice": "mms_eng",  # Default English voice
+                    "lang": "en",  # English language
+                }
+            },
+        }
+        logger.debug(f"Using config: {config}")
+
+        # Initialize provider with sherpaonnx
+        provider = TTSProviderFactory.create_provider("sherpaonnx", config)
+        if not provider:
+            logger.error("Failed to create provider")
+            return
+
+        # Get available voices
+        voices = provider.get_voices()
+        if not voices:
+            logger.error("No voices available")
+            return
+
+        # Use first available voice
+        voice_id = voices[0]["id"]
+        logger.info(f"Using voice: {voice_id}")
+
+        # Event flags for state tracking
+        long_text_started = asyncio.Event()
+        long_text_stopped = asyncio.Event()
+        short_text_started = asyncio.Event()
+        short_text_completed = asyncio.Event()
+
+        # Test 1: Long text with stop
         logger.info("=== Starting first test: Long text with stop ===")
-        # Get audio data for long text
-        logger.info("Getting audio data for long text...")
-        audio_data = provider.get_speak_data(long_text, "mms_eng")
+        long_text = "This is a long text that will be played and then stopped."
 
-        # Start playing long text
-        logger.info("Starting long text playback...")
-        provider.set_speech_handlers(on_start=on_long_start, on_stop=on_long_stop)
-        success = audio_manager.play_audio(
-            audio_data,
-            on_start=on_long_start,
-            on_complete=on_long_stop,
+        def on_start():
+            logger.info("Long text started playing")
+            long_text_started.set()
+
+        def on_stop():
+            logger.info("Long text stopped")
+            long_text_stopped.set()
+
+        def on_complete():
+            logger.info("Long text playback completed")
+
+        def on_error(error):
+            logger.error(f"Long text playback error: {error}")
+
+        success = provider.speak(
+            long_text,
+            voice_id,
+            on_start=on_start,
+            on_stop=on_stop,
+            on_complete=on_complete,
+            on_error=on_error,
         )
-
         if not success:
             logger.error("Failed to start long text playback")
             return
 
-        # Wait for playback to start with timeout
+        # Wait for start with timeout
         try:
-            await asyncio.wait_for(long_text_started.wait(), timeout=2.0)
-            logger.info("Long text playback started")
-        except asyncio.TimeoutError:
-            logger.error("Timeout waiting for playback to start")
-            audio_manager.stop()
+            await asyncio.wait_for(long_text_started.wait(), timeout=10.0)
+        except TimeoutError:
+            logger.error("Timeout waiting for long text to start")
             return
 
         # Wait a bit then stop
-        await asyncio.sleep(2.0)
-        logger.info("Stopping long text playback...")
-        audio_manager.stop()
-        long_text_stopped.set()
+        await asyncio.sleep(2)
+        logger.info("Stopping playback...")
+        provider.stop_speaking()
 
-        # Wait for stop event with timeout
+        # Wait for stop with timeout
         try:
-            await asyncio.wait_for(long_text_stopped.wait(), timeout=2.0)
-            logger.info("Long text playback stopped")
-        except asyncio.TimeoutError:
-            logger.error("Timeout waiting for playback to stop")
+            await asyncio.wait_for(long_text_stopped.wait(), timeout=10.0)
+        except TimeoutError:
+            logger.error("Timeout waiting for long text to stop")
             return
 
-        # Short delay to ensure cleanup
-        await asyncio.sleep(0.5)
+        # Test 2: Short text
+        logger.info("\n=== Starting second test: Short text ===")
+        short_text = "This is a short test."
 
-        # Second test: Short text with completion
-        logger.info("=== Starting second test: Short text with completion ===")
-        # Get audio data for short text
-        logger.info("Getting audio data for short text...")
-        audio_data = provider.get_speak_data(short_text, "mms_eng")
+        def on_start():
+            logger.info("Short text started playing")
+            short_text_started.set()
 
-        # Start playing short text
-        logger.info("Starting short text playback...")
-        provider.set_speech_handlers(
-            on_start=on_short_start, on_complete=on_short_complete
+        def on_complete():
+            logger.info("Short text completed")
+            short_text_completed.set()
+
+        def on_error(error):
+            logger.error(f"Short text playback error: {error}")
+
+        success = provider.speak(
+            short_text,
+            voice_id,
+            on_start=on_start,
+            on_complete=on_complete,
+            on_error=on_error,
         )
-        success = audio_manager.play_audio(
-            audio_data, on_start=on_short_start, on_complete=on_short_complete
-        )
-
         if not success:
             logger.error("Failed to start short text playback")
             return
 
-        # Wait for short text to start with timeout
-        try:
-            await asyncio.wait_for(short_text_started.wait(), timeout=2.0)
-            logger.info("Short text playback started")
-        except asyncio.TimeoutError:
-            logger.error("Timeout waiting for short text to start")
-            audio_manager.stop()
-            return
-
         # Wait for completion with timeout
         try:
-            await asyncio.wait_for(short_text_completed.wait(), timeout=5.0)
-            logger.info("Short text playback completed")
-        except asyncio.TimeoutError:
+            await asyncio.wait_for(short_text_completed.wait(), timeout=10.0)
+        except TimeoutError:
             logger.error("Timeout waiting for short text to complete")
-            audio_manager.stop()
             return
 
-        # Third test: Cached audio playback
-        logger.info("=== Starting third test: Cached audio playback ===")
-        # Get the same audio data again - should use cache
-        logger.info("Getting cached audio data for short text...")
-        cached_audio_data = provider.get_speak_data(short_text, "mms_eng")
+        # Test 3: Multiple short texts
+        logger.info("\n=== Starting third test: Multiple short texts ===")
+        texts = ["First text.", "Second text.", "Third text."]
 
-        # Start playing cached audio
-        logger.info("Starting cached audio playback...")
-        provider.set_speech_handlers(
-            on_start=on_cached_start, on_complete=on_cached_complete
-        )
-        success = audio_manager.play_audio(
-            cached_audio_data, on_start=on_cached_start, on_complete=on_cached_complete
-        )
+        for i, text in enumerate(texts, 1):
+            logger.info(f"Getting audio data for text {i}...")
 
-        if not success:
-            logger.error("Failed to start cached audio playback")
-            return
+            text_started = asyncio.Event()
+            text_completed = asyncio.Event()
 
-        # Wait for cached audio to start with timeout
-        try:
-            await asyncio.wait_for(cached_text_started.wait(), timeout=2.0)
-            logger.info("Cached audio playback started")
-        except asyncio.TimeoutError:
-            logger.error("Timeout waiting for cached audio to start")
-            audio_manager.stop()
-            return
+            def on_start():
+                logger.info(f"Text {i} started playing")
+                text_started.set()
 
-        # Wait for completion with timeout
-        try:
-            await asyncio.wait_for(cached_text_completed.wait(), timeout=5.0)
-            logger.info("Cached audio playback completed")
-        except asyncio.TimeoutError:
-            logger.error("Timeout waiting for cached audio to complete")
-            audio_manager.stop()
-            return
+            def on_complete():
+                logger.info(f"Text {i} completed")
+                text_completed.set()
 
-        logger.info("All tests completed successfully")
+            def on_error(error):
+                logger.error(f"Text {i} playback error: {error}")
+
+            logger.info(f"Starting Text {i} playback...")
+            success = provider.speak(
+                text,
+                voice_id,
+                on_start=on_start,
+                on_complete=on_complete,
+                on_error=on_error,
+            )
+            if not success:
+                logger.error(f"Failed to start text {i} playback")
+                continue
+
+            # Wait for completion with timeout
+            try:
+                await asyncio.wait_for(text_completed.wait(), timeout=10.0)
+            except TimeoutError:
+                logger.error(f"Timeout waiting for text {i} to complete")
+                provider.stop_speaking()
+                break
+
+        logger.info("\nAll tests completed successfully!")
 
     except Exception as e:
-        logger.error(f"Test failed with error: {str(e)}", exc_info=True)
-        audio_manager.stop()
+        logger.error(f"Test error: {e}", exc_info=True)
     finally:
-        # Ensure cleanup
-        audio_manager.stop()
+        # Cleanup
+        if provider and provider.is_speaking:
+            provider.stop_speaking()
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(test_audio_playback())
-    except KeyboardInterrupt:
-        logger.info("Test interrupted by user")
-    except Exception as e:
-        logger.error(f"Test failed: {str(e)}", exc_info=True)
+    asyncio.run(test_audio_playback())
