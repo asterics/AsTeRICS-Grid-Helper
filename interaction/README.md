@@ -11,12 +11,12 @@ This allows using features of FlipMouse or FABI from within AsTeRICS grid (via t
 * automatically rescans if device disconnects
 
 ## Requirements:
-* pip install pyserial
+* `pip install pyserial`
     
 ## Usage and optional commandline parameters:
-* python http-serial-bridge.py [--http-port <port>] [--baud <baudrate>]
- (http-port: HTTP server port, default: 8080)
- (baud: baudrate for serial connection, default: 115200)
+* `python http-serial-bridge.py [--http-port <port>] [--baud <baudrate>]`
+  * (http-port: HTTP server port, default: 8080)
+  * (baud: baudrate for serial connection, default: 115200)
 
 ### TBDs and possible improvements:
 * linux compatibility and testing
