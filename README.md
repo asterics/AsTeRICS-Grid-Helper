@@ -1,6 +1,6 @@
 # AsTeRICS-Grid-Helper
 Helper tools to enable [AsTeRICS Grid](https://github.com/asterics/AsTeRICS-Grid) to do actions on the operating system or integrations with external services, which aren't possible within the browser. 
-Currently two helper applications are provided, one for speech and one for interaction with COM/Serial ports - see folder  [interaction](https://github.com/asterics/AsTeRICS-Grid-Helper/interaction).
+Currently two types of helper applications are provided, one for speech and one for interaction (e.g. with COM/Serial ports) - see folder  [interaction](https://github.com/asterics/AsTeRICS-Grid-Helper/tree/main/interaction).
 
 ## Speech
 Normally AsTeRICS Grid uses the [Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API) and therefore voices that are installed on the operating system (e.g. SAPI voices on Windows, or voices that are coming from a TTS module on Android). Sometimes it's interesting to use voices, which aren't available as system voices. This section describes how to use an external custom speech service using Python.
